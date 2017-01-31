@@ -1,0 +1,7 @@
+package erlcm;
+
+struct rrt_traj_t {
+       int32_t num_states;
+       rrt_state_t states[num_states];
+       int32_t candidate;
+}

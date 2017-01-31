@@ -1,0 +1,9 @@
+package erlcm;
+
+struct rrt_node_t {
+       int32_t nodeid;
+       rrt_state_t state;
+       double distance_from_root;
+       double time_from_root;
+       double obs_cost_from_root; 
+}

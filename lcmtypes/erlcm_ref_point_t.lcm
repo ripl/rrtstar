@@ -1,0 +1,12 @@
+package erlcm;
+
+struct ref_point_t
+{
+    double x;
+
+    double y;
+
+    double t;
+
+    double s;
+}
