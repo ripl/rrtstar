@@ -2370,6 +2370,25 @@ on_planning_thread (gpointer data) {
 }
 
 
+static void usage(int argc, char ** argv)
+{
+    fprintf (stderr, "Usage: %s [OPTIONS]\n"
+             "RRT* motion planner\n"
+             "\n"
+             "Options:\n"
+             "  -s, --speed <SPEED>    Nominal speed (not functional?) \n"
+             "  -l, --local            Use sensing rather than map for local gridmap\n"
+             "  -n, --no-map           Don't use map for collision checking\n"
+             "  -c, --continuous       Update the gridmap even when not planning (?)\n"
+             "  -b, --basic            Don't clear occupied cells in map when there are no corresponding laser returns\n"
+             "  -l, --large-failsafe   Use a large failsafe, which relaxes constraints\n"
+             "  -t, --trash-tree       Trash the search tree after reaching a waypoint\n"
+             "  -d, --draw             Draw path queries\n"
+             "  -h, --help             Print this help and exit\n"
+             "  -v, --verbose          Verbose output\n", argv[0]);
+}
+
+
 int main (int argc, char **argv) {
    
     setlinebuf(stdout);
@@ -2384,66 +2403,69 @@ int main (int argc, char **argv) {
     gboolean clear_using_laser = TRUE; 
     gboolean no_map = FALSE; 
     double nom_speed = 0;
-    char *optstring = "s:lvtcdfbn";
+    char *optstring = "s:lvtcdfbnh";
     char c;
     struct option long_opts[] = { 
         { "speed", required_argument, 0, 's' },
-        { "local", required_argument, 0, 'l' },
-        { "no_map", no_argument, 0, 'n' },
-        { "verbose", required_argument, 0, 'v' },
-        { "draw", required_argument, 0, 'd' },
-        { "basic", required_argument, 0, 'b' },
-        { "large_failsafe", required_argument, 0, 'f' },
-        { "continuous_map_updates", required_argument, 0, 'c' },
+        { "local", no_argument, 0, 'l' },
+        { "no-map", no_argument, 0, 'n' },
+        { "verbose", no_argument, 0, 'v' },
+        { "draw", no_argument, 0, 'd' },
+        { "basic", no_argument, 0, 'b' },
+        { "large-failsafe", no_argument, 0, 'f' },
+        { "continuous", no_argument, 0, 'c' },
         //trash tree is broken now - fix
-        { "trash_tree_on_wp", required_argument, 0, 't' },
+        { "trash-tree", no_argument, 0, 't' },
+        { "help", no_argument, 0, 'h' },
         { 0, 0, 0, 0 }
     };
 
-    while ((c = getopt_long_only (argc, argv, optstring, long_opts, 0)) >= 0)
-        {
-            switch (c) {
-            case 's':
-                nom_speed = strtod (optarg, NULL);
-                reset_nom_speed = TRUE;
-                //self->default_tv = strtod ( optarg , NULL );
-                break;
-            case 'l':
-                sensing_only_local = TRUE;
-                fprintf (stdout, "Using only sensing for local gridmap\n");
-                break;
-            case 'n':
-                no_map = TRUE;
-                fprintf (stdout, "Not Using global map\n");
-                break;
-            case 'b':
-                clear_using_laser = FALSE;
-                fprintf (stdout, "Clearing using basic method\n");
-                break;
-            case 'c':
-                continuous_map_updates = TRUE;
-                fprintf (stdout, "Using only sensing for local gridmap\n");
-                break;
-            case 'f':
-                large_failsafe = TRUE;
-                fprintf (stdout, "Using only sensing for local gridmap\n");
-                break;
-            case 't':
-                //this will trash the tree at end of every waypoint 
-                trash_tree_on_wp = TRUE;
-                fprintf (stdout, "Trashing tree on waypoint\n");
-                break;
-            case 'v':
-                verbose = TRUE;
-                break;
-            case 'd':
-                draw = TRUE;
-                fprintf (stdout, "Drawing Path checks\n");
-                break;
-            default:
-                return 1;
-            };
-        }
+    while ((c = getopt_long_only (argc, argv, optstring, long_opts, 0)) >= 0) {
+        switch (c) {
+        case 's':
+            nom_speed = strtod (optarg, NULL);
+            reset_nom_speed = TRUE;
+            //self->default_tv = strtod ( optarg , NULL );
+            break;
+        case 'l':
+            sensing_only_local = TRUE;
+            fprintf (stdout, "Using only sensing for local gridmap\n");
+            break;
+        case 'n':
+            no_map = TRUE;
+            fprintf (stdout, "Not Using global map\n");
+            break;
+        case 'b':
+            clear_using_laser = FALSE;
+            fprintf (stdout, "Clearing using basic method\n");
+            break;
+        case 'c':
+            continuous_map_updates = TRUE;
+            //fprintf (stdout, "Using only sensing for local gridmap\n");
+            break;
+        case 'f':
+            large_failsafe = TRUE;
+            //fprintf (stdout, "Using only sensing for local gridmap\n");
+            break;
+        case 't':
+            //this will trash the tree at end of every waypoint 
+            trash_tree_on_wp = TRUE;
+            fprintf (stdout, "Trashing tree on waypoint\n");
+            break;
+        case 'v':
+            verbose = TRUE;
+            break;
+        case 'd':
+            draw = TRUE;
+            fprintf (stdout, "Drawing Path checks\n");
+            break;
+        case 'h':
+            usage (argc, argv);
+            return 1;
+        default:
+            return 1;
+        };
+    }
 
     rrtstar_t *self = rrtstar_create (sensing_only_local,trash_tree_on_wp, verbose, draw, clear_using_laser, no_map);
 
