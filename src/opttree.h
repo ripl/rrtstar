@@ -97,7 +97,8 @@ struct _opttree_t {
 
 
 // Creates a new opttree_t structure and returns a pointer to it
-opttree_t* opttree_create (gboolean sensing_only_local, gboolean draw, gboolean clear_using_laser, gboolean sensing_only_small);
+opttree_t* opttree_create (gboolean sensing_only_local, gboolean draw, gboolean clear_using_laser, 
+                           gboolean sensing_only_small, double check_gridmap_width_buffer);
 
 // Deallocates memory allocated for a given opttree_t structure
 int opttree_destroy (opttree_t *self);

@@ -783,13 +783,14 @@ int opttree_reinitialize (opttree_t *self) {
 }
 
 
-opttree_t* opttree_create (gboolean sensing_only_local, gboolean draw, gboolean clear_using_laser, gboolean sensing_only_small) { 
+opttree_t* opttree_create (gboolean sensing_only_local, gboolean draw, gboolean clear_using_laser, 
+                           gboolean sensing_only_small, double check_gridmap_width_buffer) { 
 
     opttree_t *self = (opttree_t *) calloc (sizeof (opttree_t), 1);
 
     // Set up the dynamical system
     self->optsys = (optsystem_t *) calloc (sizeof (optsystem_t), 1);
-    optsystem_new_system (self->optsys, sensing_only_local, draw, clear_using_laser, sensing_only_small);
+    optsystem_new_system (self->optsys, sensing_only_local, draw, clear_using_laser, sensing_only_small, check_gridmap_width_buffer);
     
     // Initialize the kdtree
     self->kdtree = kd_create (optsystem_get_num_states(self->optsys));

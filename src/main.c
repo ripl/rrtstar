@@ -38,6 +38,8 @@
 #include <bot_param/param_client.h>
 #include <geom_utils/convexhull.h>
 
+#define DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER 0.1
+
 #define GETCFI(key, val, prefix)                        \
     if (bot_param_get_int (config, key, val) != 0) {    \
         DBG_W ("%s: Error reading %s!\n", prefix, key); \
@@ -766,16 +768,21 @@ void read_parameters(rrtstar_t *self)
 
 
 rrtstar_t *rrtstar_create(gboolean sensing_only_local, gboolean trash_tree_on_wp, gboolean verbose, gboolean draw, 
-                          gboolean clear_using_laser, gboolean sensing_only_small) {
+                          gboolean clear_using_laser, gboolean sensing_only_small, double check_gridmap_width_buffer) {
     
     rrtstar_t *self = (rrtstar_t *) calloc (1, sizeof(rrtstar_t));
     g_thread_init(NULL);
     self->rrt_environment_last = NULL;
     self->lcm = bot_lcm_get_global (NULL);    
+    if (!self->lcm) {
+        fprintf (stderr, "Unable to get LCM instance\n");
+        return NULL;
+    }
     self->param = bot_param_new_from_server(self->lcm, 1);
 
     if (!self->param) {
-      fprintf (stderr, "Couldn't get BotParam instance\n");
+      fprintf (stderr, "Unable to get BotParam instance\n");
+      return NULL;
     }
 
     self->frames = bot_frames_get_global (self->lcm, self->param);
@@ -814,7 +821,7 @@ rrtstar_t *rrtstar_create(gboolean sensing_only_local, gboolean trash_tree_on_wp
     self->goal_list = NULL;
     self->goal_list_global = NULL;
     
-    self->opttree = opttree_create (sensing_only_local, draw, clear_using_laser, sensing_only_small);
+    self->opttree = opttree_create (sensing_only_local, draw, clear_using_laser, sensing_only_small, check_gridmap_width_buffer);
     
     fprintf(stderr, "Done creating\n");
     self->opttree->optsys->failsafe_level = self->basic_failsafe;
@@ -2377,15 +2384,17 @@ static void usage(int argc, char ** argv)
              "\n"
              "Options:\n"
              "  -s, --speed <SPEED>    Nominal speed (not functional?) \n"
-             "  -l, --local            Use sensing rather than map for local gridmap\n"
+             "  -w, --width <NUM>      Additional width to add for check_gridmap (default: %.2f)\n"
+             "  -l, --local            Populate the region of the gridmap around the robot\n"
+             "                         based only on detected obstacles, ignoring SLAM occupancy map\n"
              "  -n, --no-map           Don't use map for collision checking\n"
              "  -c, --continuous       Update the gridmap even when not planning (?)\n"
-             "  -b, --basic            Don't clear occupied cells in map when there are no corresponding laser returns\n"
+             "  -D, --dont-clear       Don't clear occupied cells in map when there are no corresponding laser returns\n"
              "  -l, --large-failsafe   Use a large failsafe, which relaxes constraints\n"
              "  -t, --trash-tree       Trash the search tree after reaching a waypoint\n"
              "  -d, --draw             Draw path queries\n"
              "  -h, --help             Print this help and exit\n"
-             "  -v, --verbose          Verbose output\n", argv[0]);
+             "  -v, --verbose          Verbose output\n", argv[0], DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER);
 }
 
 
@@ -2393,6 +2402,19 @@ int main (int argc, char **argv) {
    
     setlinebuf(stdout);
 
+    /*
+     * The following options are used for check_gridmap_create
+     *
+     * sensing_only_local:        Specify whether to populate the area of the gridmap around the
+     *                            robot based only on detected obstacles and not use the 
+     *                            SLAM occupancy map.
+     *
+     * no_map/sensing_only_small: Generate spatially compact gridmap that only renders
+     *                            locally-perceived obstacles. (Added for door open/closed detection.)
+     *
+     * clear_using_laser :        Clear the map using the extent of the laser
+     *
+     */
     gboolean sensing_only_local = FALSE;
     gboolean draw = FALSE;
     gboolean reset_nom_speed = FALSE;
@@ -2403,15 +2425,17 @@ int main (int argc, char **argv) {
     gboolean clear_using_laser = TRUE; 
     gboolean no_map = FALSE; 
     double nom_speed = 0;
-    char *optstring = "s:lvtcdfbnh";
+    double check_gridmap_width_buffer = DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER;
+    char *optstring = "s:w:lvtcdfDnh";
     char c;
     struct option long_opts[] = { 
         { "speed", required_argument, 0, 's' },
+        { "width", required_argument, 0, 'w' },
         { "local", no_argument, 0, 'l' },
         { "no-map", no_argument, 0, 'n' },
         { "verbose", no_argument, 0, 'v' },
         { "draw", no_argument, 0, 'd' },
-        { "basic", no_argument, 0, 'b' },
+        { "dont-clear", no_argument, 0, 'D' },
         { "large-failsafe", no_argument, 0, 'f' },
         { "continuous", no_argument, 0, 'c' },
         //trash tree is broken now - fix
@@ -2427,6 +2451,10 @@ int main (int argc, char **argv) {
             reset_nom_speed = TRUE;
             //self->default_tv = strtod ( optarg , NULL );
             break;
+        case 'w':
+            check_gridmap_width_buffer = strtod (optarg, NULL);
+            fprintf (stdout, "Using %.2f as the additional width buffer for check_gridmap\n", check_gridmap_width_buffer);
+            break;
         case 'l':
             sensing_only_local = TRUE;
             fprintf (stdout, "Using only sensing for local gridmap\n");
@@ -2435,7 +2463,7 @@ int main (int argc, char **argv) {
             no_map = TRUE;
             fprintf (stdout, "Not Using global map\n");
             break;
-        case 'b':
+        case 'D':
             clear_using_laser = FALSE;
             fprintf (stdout, "Clearing using basic method\n");
             break;
@@ -2467,7 +2495,13 @@ int main (int argc, char **argv) {
         };
     }
 
-    rrtstar_t *self = rrtstar_create (sensing_only_local,trash_tree_on_wp, verbose, draw, clear_using_laser, no_map);
+    rrtstar_t *self = rrtstar_create (sensing_only_local,trash_tree_on_wp, verbose, draw, 
+                                      clear_using_laser, no_map, check_gridmap_width_buffer);
+    
+    if (!self) {
+        fprintf (stderr, "rrtstar_create failed\n");
+        return -1;
+    }
 
     if(large_failsafe){
         self->basic_failsafe = 1;

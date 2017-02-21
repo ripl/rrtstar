@@ -64,17 +64,18 @@ double optsystem_extend_dubins (optsystem_t *self, state_t *state_ini, state_t *
 
 
 // Allocates memory for and initializes an empty dynamical system
-int optsystem_new_system (optsystem_t *self, gboolean sensing_only_local, gboolean draw, gboolean clear_using_laser, gboolean sensing_only_small) {
+int optsystem_new_system (optsystem_t *self, gboolean sensing_only_local, gboolean draw, 
+                          gboolean clear_using_laser, gboolean sensing_only_small, double check_gridmap_width_buffer) {
 
     self->initial_state = (state_t *) malloc (sizeof(state_t));
     for (int i = 0; i < NUM_STATES; i++)
         self->initial_state->x[i] = 0.0;
 
     if(clear_using_laser){
-        self->grid = check_gridmap_create_laser(0, draw, sensing_only_local, sensing_only_small, TRUE, FALSE, FALSE, TRUE, 0.3);
+        self->grid = check_gridmap_create_laser(0, draw, sensing_only_local, sensing_only_small, TRUE, FALSE, FALSE, TRUE, check_gridmap_width_buffer);
     }
     else{
-        self->grid = check_gridmap_create(0, draw, sensing_only_local, sensing_only_small, TRUE, FALSE, FALSE, 0.3);
+        self->grid = check_gridmap_create(0, draw, sensing_only_local, sensing_only_small, TRUE, FALSE, FALSE, check_gridmap_width_buffer);
     }
 
     self->is_elevator = FALSE;

@@ -53,7 +53,7 @@ typedef struct _optsystem_t optsystem_t;
 // Initializes the optsystem_t structure
 int
 optsystem_new_system (optsystem_t *self, gboolean sensing_only_local, gboolean draw, 
-                      gboolean clear_using_laser, gboolean sensing_only_small);
+                      gboolean clear_using_laser, gboolean sensing_only_small, double check_gridmap_width_buffer);
 
 // Frees the memory allocated for elements of the optsystem_t structure
 int
