@@ -5,8 +5,6 @@
 #define TV_STOPPED_THRESHOLD 0.05
 #define RV_STOPPED_THRESHOLD 0.05
 
-#define COMMIT_TIME 0.7//1.0//1.0 //was 3.0
-
 // The maximum allowable obs_max cost along the
 // committed trajectory above which the bot will stop
 #define COMMIT_OBS_MAX_COLLISION 200
@@ -38,7 +36,7 @@
 #include <bot_param/param_client.h>
 #include <geom_utils/convexhull.h>
 
-#define DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER 0.1
+#define DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER 0.2
 
 #define GETCFI(key, val, prefix)                        \
     if (bot_param_get_int (config, key, val) != 0) {    \
@@ -71,6 +69,8 @@ typedef struct _rrt_config_t {
     int traj_pub_iteration_limit;
     int traj_pub_time_limit;
     gboolean traj_pub_final;
+
+    double commit_time;
 } rrt_config_t; 
 
 
@@ -101,6 +101,7 @@ typedef struct _rrtstar_t {
     gboolean verbose_tree_msg;
     gboolean verbose_traj_msg;
     gboolean continuous_map_updates;
+    gboolean enable_turn_in_place;
     int basic_failsafe;
     
     int num_nodes;
@@ -341,12 +342,13 @@ is_committed_trajectory_in_collision (rrtstar_t *self) {
         double dist = sqrt(bot_sq(state_start->x[0]-state_next->x[0]) + bot_sq(state_start->x[1]-state_next->x[1]));
         struct check_path_result path_res;
         int is_forward = 1;
-        int failsafe = 2; // When failsafe >= 1, reduce vehicle footprint (width)
+        int failsafe = 0; //2; // When failsafe >= 1, reduce vehicle footprint (width)
         check_gridmap_check_path (self->opttree->optsys->grid, is_forward, failsafe,
                                   state_start->x[0], state_start->x[1], state_start->x[2],
                                   state_next->x[0], state_next->x[1], state_next->x[2],
                                   &path_res);
 
+        //fprintf (stdout, "path_res.obs_max = %.2f\n", path_res.obs_max);
         if (path_res.obs_max > max_obs_max)
             max_obs_max = path_res.obs_max;
         else if (path_res.obs_max < 0)
@@ -361,7 +363,6 @@ is_committed_trajectory_in_collision (rrtstar_t *self) {
 
     if (max_obs_max > COMMIT_OBS_MAX_COLLISION) {
         fprintf (stdout, "Committed trajectory is in collision. Max obs_max = %.4f!\n", max_obs_max);
-
         return 1;
     }
     else if (pass_thru_unknown) {
@@ -764,6 +765,7 @@ void read_parameters(rrtstar_t *self)
     self->config.traj_pub_time_limit =  bot_param_get_int_or_fail (self->param,"motion_planner.rrtstar.traj_pub_time_limit");
     self->config.traj_pub_final =  bot_param_get_boolean_or_fail (self->param,"motion_planner.rrtstar.traj_pub_final");
     self->default_tv = bot_param_get_double_or_fail (self->param, "motion_planner.speed_design.default_tv");
+    self->config.commit_time =  bot_param_get_double_or_fail (self->param,"motion_planner.rrtstar.commit_time");
 }
 
 
@@ -1528,29 +1530,32 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
                         
             fprintf(stdout, "+++++++ Goal is behind the bot! +++++++\n");
 
-            self->publish_waypoint_status = 0; 
-            turn_in_place =1;
-            //turn towards the goal 
-            double turn_heading = atan2(self->goal_list->goals[c_ind].pos[1] -self->bot_pose_last->pos[1], 
-                                        self->goal_list->goals[c_ind].pos[0] -self->bot_pose_last->pos[0]);
-                        
-            //message to controller goes here
-            erlcm_ref_point_t list[1];
-            erlcm_ref_point_t goal;
-                        
-            goal.x = self->bot_pose_last->pos[0];
-            goal.y = self->bot_pose_last->pos[1];
-            goal.t = turn_heading;
-            goal.s = 0;
-            list[0] = goal;            
-                        
-            erlcm_ref_point_list_t pub = {
-                .num_ref_points = 1,
-                .ref_points = list,
-                .mode = ERLCM_REF_POINT_LIST_T_TURN_IN_PLACE,
-                .id = self->goal_id 
-            };
-            erlcm_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
+            if (self->enable_turn_in_place) {
+    
+                self->publish_waypoint_status = 0; 
+                turn_in_place =1;
+                //turn towards the goal 
+                double turn_heading = atan2(self->goal_list->goals[c_ind].pos[1] -self->bot_pose_last->pos[1], 
+                                            self->goal_list->goals[c_ind].pos[0] -self->bot_pose_last->pos[0]);
+                
+                //message to controller goes here
+                erlcm_ref_point_t list[1];
+                erlcm_ref_point_t goal;
+                
+                goal.x = self->bot_pose_last->pos[0];
+                goal.y = self->bot_pose_last->pos[1];
+                goal.t = turn_heading;
+                goal.s = 0;
+                list[0] = goal;            
+                
+                erlcm_ref_point_list_t pub = {
+                    .num_ref_points = 1,
+                    .ref_points = list,
+                    .mode = ERLCM_REF_POINT_LIST_T_TURN_IN_PLACE,
+                    .id = self->goal_id 
+                };
+                erlcm_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
+            }
         }
     }
 
@@ -1906,7 +1911,7 @@ on_planning_thread (gpointer data) {
 
                 //use the path to the old solution 
                 double new_root[3] = {.0,.0,.0}; 
-                int no_new_root = opttree_get_commit_end_point_to_old_goal(self->opttree, COMMIT_TIME , new_root);
+                int no_new_root = opttree_get_commit_end_point_to_old_goal(self->opttree, self->config.commit_time , new_root);
 
                 if (self->verbose_motion)
                     fprintf(stderr," ---------- Using earlier solution. New Root is : %f,%f,%f : %d\n",  
@@ -1928,7 +1933,7 @@ on_planning_thread (gpointer data) {
                 reset_bot_at_committed_traj (self);
         
                 //publish the path to the old path node - this will screw up with branch and bound
-                self->committed_traj = opttree_commit_traj_to_old_goal (self->opttree, COMMIT_TIME , &all_committed);                
+                self->committed_traj = opttree_commit_traj_to_old_goal (self->opttree, self->config.commit_time , &all_committed);                
                 publish_tree (self);
                 tree_pub_iteration_last = num_iterations;
             
@@ -2012,7 +2017,7 @@ on_planning_thread (gpointer data) {
         publish_traj (self);
 
         double new_root[3] = {.0,.0,.0}; 
-        int no_new_root = opttree_get_commit_end_point(self->opttree, COMMIT_TIME , new_root);
+        int no_new_root = opttree_get_commit_end_point(self->opttree, self->config.commit_time , new_root);
 
         if (self->verbose_motion)
             fprintf(stderr," ---------- Bot reached end of committed trajectory. New Root is : %f,%f,%f : %d\n",  
@@ -2052,7 +2057,7 @@ on_planning_thread (gpointer data) {
             failed_last_attempt = 0;
         }
 
-        self->committed_traj = opttree_commit_traj (self->opttree,  COMMIT_TIME , &all_committed_initial);
+        self->committed_traj = opttree_commit_traj (self->opttree,  self->config.commit_time , &all_committed_initial);
 
         if(all_committed_initial){
             if(self->current_goal_ind == self->goal_list->num_goals-1){
@@ -2112,7 +2117,7 @@ on_planning_thread (gpointer data) {
                     //committing part of the traj and setting new goal
                     
                     double new_root[3] = {.0,.0,.0}; 
-                    int no_new_root = opttree_get_commit_end_point(self->opttree, COMMIT_TIME , new_root);
+                    int no_new_root = opttree_get_commit_end_point(self->opttree, self->config.commit_time , new_root);
                     
                     if (self->verbose_motion)
                         fprintf(stderr," ---------- Bot reached end of committed trajectory and is near goal. New Root is : %f,%f,%f : %d\n",  
@@ -2132,7 +2137,7 @@ on_planning_thread (gpointer data) {
                     int all_committed = 0;
             
                     if(!self->trash_tree_on_wp){                  
-                        self->committed_traj = opttree_commit_traj (self->opttree, COMMIT_TIME, &all_committed);
+                        self->committed_traj = opttree_commit_traj (self->opttree, self->config.commit_time, &all_committed);
                     }
                     else{
                         self->committed_traj = opttree_commit_traj_all (self->opttree);
@@ -2181,7 +2186,7 @@ on_planning_thread (gpointer data) {
                 else{//commit a bit more of the traj  
 
                     double new_root[3] = {.0,.0,.0}; 
-                    int no_new_root = opttree_get_commit_end_point(self->opttree, COMMIT_TIME , new_root);
+                    int no_new_root = opttree_get_commit_end_point(self->opttree, self->config.commit_time , new_root);
 
                     if (self->verbose_motion)
                         fprintf(stderr," ---------- Bot reached end of committed trajectory but not near goal. New Root is : %f,%f,%f : %d\n",  
@@ -2199,7 +2204,7 @@ on_planning_thread (gpointer data) {
                     }
                     g_slist_free (self->committed_traj);
                     // Update the committed traj
-                    self->committed_traj = opttree_commit_traj (self->opttree, COMMIT_TIME , &all_committed);
+                    self->committed_traj = opttree_commit_traj (self->opttree, self->config.commit_time, &all_committed);
 
                     if(all_committed){
                         if(self->current_goal_ind == self->goal_list->num_goals-1){
@@ -2283,7 +2288,7 @@ on_planning_thread (gpointer data) {
         // Are we here because the committed trajectory was in collision? If so, reinitialize the tree
         if (((committed_in_collision) && !bot_at_goal && !stop_iter) || failed_last_attempt) {
             fprintf(stderr, " ++++++ Committed trajectory in collision. Trashing the tree \n");
-            fprintf(stderr, "Failed reason : Failed last attempt (no collision checking done here\n");
+            fprintf(stderr, "Failed reason : Failed last attempt (no collision checking done here)\n");
             opttree_reinitialize (self->opttree);
             g_mutex_unlock (self->plan_mutex);
         }
@@ -2393,6 +2398,7 @@ static void usage(int argc, char ** argv)
              "  -l, --large-failsafe   Use a large failsafe, which relaxes constraints\n"
              "  -t, --trash-tree       Trash the search tree after reaching a waypoint\n"
              "  -d, --draw             Draw path queries\n"
+             "  -N, --no-turn-in-place Disable turn in place for goals behind robot\n"
              "  -h, --help             Print this help and exit\n"
              "  -v, --verbose          Verbose output\n", argv[0], DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER);
 }
@@ -2423,10 +2429,11 @@ int main (int argc, char **argv) {
     gboolean continuous_map_updates = FALSE; 
     gboolean large_failsafe = FALSE; 
     gboolean clear_using_laser = TRUE; 
+    gboolean enable_turn_in_place = TRUE;
     gboolean no_map = FALSE; 
     double nom_speed = 0;
     double check_gridmap_width_buffer = DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER;
-    char *optstring = "s:w:lvtcdfDnh";
+    char *optstring = "s:w:lvtcdfDnNh";
     char c;
     struct option long_opts[] = { 
         { "speed", required_argument, 0, 's' },
@@ -2440,6 +2447,7 @@ int main (int argc, char **argv) {
         { "continuous", no_argument, 0, 'c' },
         //trash tree is broken now - fix
         { "trash-tree", no_argument, 0, 't' },
+        { "no-turn-in-place", no_argument, 0, 'N' },
         { "help", no_argument, 0, 'h' },
         { 0, 0, 0, 0 }
     };
@@ -2487,6 +2495,10 @@ int main (int argc, char **argv) {
             draw = TRUE;
             fprintf (stdout, "Drawing Path checks\n");
             break;
+        case 'N':
+            enable_turn_in_place = FALSE;
+            fprintf (stdout, "Disabling turn-in-place\n");
+            break;
         case 'h':
             usage (argc, argv);
             return 1;
@@ -2507,6 +2519,7 @@ int main (int argc, char **argv) {
         self->basic_failsafe = 1;
     }
     self->continuous_map_updates = continuous_map_updates;
+    self->enable_turn_in_place = enable_turn_in_place;
     fprintf (stdout, "The RRT* is alive\n");
     
     g_mutex_lock (self->plan_mutex);
