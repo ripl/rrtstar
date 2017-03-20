@@ -9,6 +9,11 @@
 // committed trajectory above which the bot will stop
 #define COMMIT_OBS_MAX_COLLISION 200
 
+// These should be moved to config
+#define BOT_AT_GOAL_DIST 1.0
+#define BOT_AT_GOAL_TIGHT_DIST 1.0
+#define BOT_NEAR_GOAL_DIST 4.0 //8.0
+
 #ifdef __APPLE
 #include <GL/gl.h>
 #else
@@ -242,7 +247,7 @@ is_bot_at_goal (rrtstar_t *self, erlcm_goal_t *latest_goal) {
     double dist_y = self->bot_pose_last->pos[1] - latest_goal->pos[1];
     double dist = sqrt(dist_x * dist_x + dist_y * dist_y);
     
-    if (dist < 1.0){
+    if (dist < BOT_AT_GOAL_DIST){
         if(self->verbose_motion)
             fprintf(stderr,"Already at goal - ignoring\n");
     
@@ -264,7 +269,7 @@ is_bot_at_goal_tight (rrtstar_t *self, erlcm_goal_t *latest_goal) {
     double dist_y = self->bot_pose_last->pos[1] - latest_goal->pos[1];
     double dist = sqrt(dist_x * dist_x + dist_y * dist_y);
     
-    if(dist < 1.0){
+    if(dist < BOT_AT_GOAL_TIGHT_DIST){
         //fprintf(stderr, "Dist to goal : %f\n", dist); 
     }
 
@@ -289,7 +294,7 @@ is_bot_near_goal (rrtstar_t *self, erlcm_goal_t *latest_goal) {
     double dist_y = self->bot_pose_last->pos[1] - latest_goal->pos[1];
     double dist = sqrt(dist_x * dist_x + dist_y * dist_y);
     
-    if (dist < 8.0){
+    if (dist < BOT_NEAR_GOAL_DIST){
         if(self->verbose_motion)
             fprintf(stdout,"Bot is near goal\n");
         return 1;
@@ -511,7 +516,12 @@ static void update_local_goal_list(rrtstar_t *self){
     }    
 }
 
-
+// If we get a new goal list, we currently stop the robot and stop searching.
+// We should instead adapt the tree according to the new goal (i.e., identify 
+// the (new) optimial path to the goal if it exists and continue planning). 
+// Alternatively, the simplist thing to do would be to trash the tree after the 
+// committed trajectory and restart search while the vehicle drives to the committed
+// trajectory
 static void
 on_goals(const lcm_recv_buf_t * rbuf, const char *channel,     
          const erlcm_goal_list_t *msg, void *user) {
@@ -531,6 +541,7 @@ on_goals(const lcm_recv_buf_t * rbuf, const char *channel,
         erlcm_goal_list_t_destroy(self->goal_list_global);   
     }
 
+    // We probably don't want to be stopping the robot and rrtstar
     if(is_running){
         g_mutex_lock (self->stop_iter_mutex);
         self->stop_iter = 1;
@@ -1827,7 +1838,7 @@ on_planning_thread (gpointer data) {
 
         //update the operating region
         //operating region should include the goal and the bot and space inbetween 
-        set_operating_region(self,c_ind);
+        set_operating_region(self, c_ind);
         
         //draw the operating region 
         draw_operating_region(self);
