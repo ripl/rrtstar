@@ -48,19 +48,19 @@ send_goal_message(lcm_t * lcm)
     my_goals.num_goals = 3;
 
     erlcm_goal_t *goal  = (erlcm_goal_t*)calloc(3, sizeof(erlcm_goal_t));
-    goal[0].id = 1
+    goal[0].id = 1;
     goal[0].pos[0] = 1.1;
     goal[0].pos[1] = -6.7;
     goal[0].size[0] = 3;
     goal[0].size[1] = 3;
 
-    goal[1].id = 2
+    goal[1].id = 2;
     goal[1].pos[0] = -3.36;
     goal[1].pos[1] = -2.6;
     goal[1].size[0] = 3;
     goal[1].size[1] = 3;
 
-    goal[2].id = 3
+    goal[2].id = 3;
     goal[2].pos[0] = -4.77;
     goal[2].pos[1] = 10.0;
     goal[2].size[0] = 3;
