@@ -112,6 +112,8 @@ int opttree_iteration (opttree_t *self);
 // Empties the tree and reinializes all the related variables
 int opttree_reinitialize (opttree_t *self);
 
+int opttree_remove_branch (opttree_t *self, node_t *node_curr);
+
 // Empties the tree and reinializes all the related variables
 int opttree_reset (opttree_t *self);
 

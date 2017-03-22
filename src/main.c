@@ -875,19 +875,16 @@ optmain_publish_optimal_path (rrtstar_t *self, gboolean rampup_speed,
         
     int n_states = 0; 
 
-    //fprintf(stderr, " ======== Invalid Root : %d\n", invalid_root);    
-
     GSList *optstates_list = NULL;
-    {
-        node_t *node_curr = self->opttree->lower_bound_node;
-        while (node_curr) {
-            optstates_list = g_slist_prepend (optstates_list, node_curr);
-            n_states += g_slist_length (node_curr->traj_from_parent) + 1;
-            node_curr = node_curr->parent;
-        }
+    node_t *node_curr = self->opttree->lower_bound_node;
+    while (node_curr) {
+        optstates_list = g_slist_prepend (optstates_list, node_curr);
+        n_states += g_slist_length (node_curr->traj_from_parent) + 1;
+        node_curr = node_curr->parent;
     }
 
-    fprintf(stdout,"Publishing optimal trajectory (size = %d)\n", n_states);
+    if (self->verbose_motion)
+        fprintf(stdout,"Publishing optimal trajectory (size = %d)\n", n_states);
 
     erlcm_ref_point_t list[n_states];
 
@@ -1138,6 +1135,158 @@ optmain_publish_optimal_path_to_old_goal (rrtstar_t *self, gboolean rampup_speed
     erlcm_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
     
     return 1;
+}
+
+
+int remove_node (rrtstar_t *self, node_t *node_curr) {
+    int found_new_lower_bound_node = 0;
+
+    opttree_remove_branch (self->opttree, node_curr);
+
+    // Destroy the kd-tree and rebuild
+    int64_t time_start_kd = bot_timestamp_now ();
+    kd_clear (self->opttree->kdtree);
+    
+
+    self->opttree->lower_bound = DBL_MAX;
+    self->opttree->lower_bound_node = NULL;
+
+    //do we trash this ??
+    //self->lower_bound_node_to_first_goal = NULL;
+
+    self->opttree->num_nodes = 0;
+
+    
+    GSList *nodes_ptr = self->opttree->list_nodes;
+    if (!nodes_ptr)
+        fprintf (stderr, "ERROR: nodes_ptr is NULL. Function removed entire tree!\n");
+    while (nodes_ptr) {
+        node_t *node_curr = nodes_ptr->data;
+        // We really should be checking these nodes for collision too. Currently, this relies
+        // on the lazy_collision_check call to find them. The same is true when updating
+        // the lower_bound_node in opttree, which currently does not re-check for collisions
+        if ( optsystem_is_reaching_target(self->opttree->optsys, node_curr->state) && (node_curr->distance_from_root < self->opttree->lower_bound)) {
+            self->opttree->lower_bound = node_curr->distance_from_root;
+            self->opttree->lower_bound_node = node_curr;
+            found_new_lower_bound_node = 1;
+        }
+        kd_insert (self->opttree->kdtree, optsystem_get_state_key (self->opttree->optsys, node_curr->state), node_curr);
+        self->opttree->num_nodes++;
+        nodes_ptr = g_slist_next (nodes_ptr);
+    }
+    
+    return found_new_lower_bound_node;
+
+}
+
+// Check to see whether the optimal trajectory is in collision
+int lazy_collision_check (rrtstar_t *self) {
+    opttree_t *opttree = self->opttree;
+    
+    GSList *opttraj_nodes = NULL;
+    
+    int num_states = 0;
+    node_t *optnode = opttree->lower_bound_node; 
+    while (optnode) {
+        opttraj_nodes = g_slist_prepend (opttraj_nodes, optnode);
+        num_states += g_slist_length (optnode->traj_from_parent) + 1;
+        optnode = optnode->parent;
+    } 
+    
+
+    if (num_states > 0) {
+
+        check_gridmap_update (self->opttree->optsys->grid);
+
+        int first_state = 1;
+        double xlast, ylast, tlast;
+        double x, y, t;
+        GSList *opttraj_nodes_ptr = opttraj_nodes;
+        struct check_path_result path_res;
+        int is_forward = 1;
+        int failsafe = self->opttree->optsys->failsafe_level;
+        while (opttraj_nodes_ptr) {
+            node_t *node_curr = (node_t *)(opttraj_nodes_ptr->data);
+            GSList *traj_from_parent_ptr = node_curr->traj_from_parent;
+            while (traj_from_parent_ptr) {
+                state_t *state_this = (state_t *)(traj_from_parent_ptr->data);
+                x = state_this->x[0];
+                y = state_this->x[1];
+                t = state_this->x[2];
+                
+                if (!first_state) {
+                    
+                    check_gridmap_check_path (self->opttree->optsys->grid, is_forward, failsafe,
+                                              xlast, ylast, tlast,
+                                              x, y, t,
+                                              &path_res); 
+                    
+                    // We consider the segment to be in collision if either
+                    //   (i)  The line-integrated cost is negative or
+                    //   (ii) The maximum obstacle cost along the path exceeds a threshold
+                    if ((path_res.cost < 0) || (path_res.obs_max > COMMIT_OBS_MAX_COLLISION) || (path_res.obs_max) < 0) {
+                        
+                        // Remove the violating node, and if a new lower_bound_node isn't found (by remove_node),
+                        // then set the previous node as the lower_bound_node,
+                        // and set the bound to max. This way, there is still a valid path
+                        // to use for the committed trajectory and any other node that reaches
+                        // the goal should become the new lower_bound_node
+                        if (!remove_node (self, node_curr)) {
+                            self->opttree->lower_bound = DBL_MAX;
+                            self->opttree->lower_bound_node = node_curr->parent;
+                        }
+                        g_slist_free (opttraj_nodes);
+                        return 1;
+                    }
+                }
+                traj_from_parent_ptr = g_slist_next (traj_from_parent_ptr);
+                xlast = x;
+                ylast = y;
+                tlast = t;
+                first_state = 0;
+            }
+            x = node_curr->state->x[0];
+            y = node_curr->state->x[1];
+            t = node_curr->state->x[2];
+            if (!first_state) {
+                
+                check_gridmap_check_path (self->opttree->optsys->grid, is_forward, failsafe,
+                                          xlast, ylast, tlast,
+                                          x, y, t,
+                                          &path_res); 
+                
+                // We consider the segment to be in collision if either
+                //   (i)  The line-integrated cost is negative or
+                //   (ii) The maximum obstacle cost along the path exceeds a threshold
+                if ((path_res.cost < 0) || (path_res.obs_max > COMMIT_OBS_MAX_COLLISION) || (path_res.obs_max) < 0) {
+
+                    // Remove the violating node, and if a new lower_bound_node isn't found (by remove_node),
+                    // then set the previous node as the lower_bound_node,
+                    // and set the bound to max. This way, there is still a valid path
+                    // to use for the committed trajectory and any other node that reaches
+                    // the goal should become the new lower_bound_node
+                    if (!remove_node (self, node_curr)) {
+                        self->opttree->lower_bound = DBL_MAX;
+                        self->opttree->lower_bound_node = node_curr->parent;
+                    }
+
+                    g_slist_free (opttraj_nodes);
+                    return 1;
+                }
+            }
+            xlast = x;
+            ylast = y;
+            tlast = t;
+            opttraj_nodes_ptr = g_slist_next (opttraj_nodes_ptr);
+        }
+        
+    }
+
+    g_slist_free (opttraj_nodes);
+    
+    return 0;
+
+
 }
 
 // publishes trajectories so they can be rendered
@@ -2079,6 +2228,11 @@ on_planning_thread (gpointer data) {
         // Check to see whether the committed trajectory is in collision
         committed_in_collision = is_committed_trajectory_in_collision (self);
 
+        // Check to see whether the optimal trajectory is in collision
+        //int opt_in_collision = opt_traj_in_collision (self);
+        //if (opt_in_collision)
+        //    fprintf (stdout, "Optimal trajectory is in collision\n");
+
         if (committed_in_collision) {
             if(stop_robot_in_collision_traj(self)){
                 break;
@@ -2117,6 +2271,27 @@ on_planning_thread (gpointer data) {
                 opttree_branch_and_bound (self->opttree);
             } 
 #endif 
+
+            if ((self->iteration_no)%100 == 0) {
+                if (lazy_collision_check (self)) {
+                    if (self->verbose_motion)
+                        fprintf (stdout, "Optimal trajectory is in collision\n");
+
+                    // Publish the path to the new lower_bound_node (note that
+                    // this path may not reach the goal, but if that is the case
+                    // the cost is max and the path should be replaced as soon
+                    // as a new path to the goal is found
+                    double new_root[3] = {.0,.0,.0}; 
+                    int no_new_root = opttree_get_commit_end_point(self->opttree, self->config.commit_time , new_root);
+                    
+                    if (self->verbose_motion)
+                        fprintf(stderr," ---------- Setting new path with new root : %f,%f,%f : %d\n",  
+                                new_root[0], new_root[1], new_root[2], no_new_root);  
+
+                    //optmain_publish_optimal_path (self, FALSE, new_root, no_new_root);
+                }
+
+            }
 
             // Publish the tree message if the interval is correct
             int64_t time_now = bot_timestamp_now ();
