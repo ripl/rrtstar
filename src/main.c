@@ -321,7 +321,6 @@ int
 is_committed_trajectory_in_collision (rrtstar_t *self) {
 
     //commited traj in collision check has been disabled for now - Matt (to fix)
-    fprintf(stderr,"******* Err: Collision check disabled **********\n");
     return 0;
 
     // The path is in collision if either the maximum obs_max along the
@@ -885,6 +884,12 @@ optmain_publish_optimal_path (rrtstar_t *self, gboolean rampup_speed,
 
     if (self->verbose_motion)
         fprintf(stdout,"Publishing optimal trajectory (size = %d)\n", n_states);
+
+    // If the optimal trajectory is empty, stop the bot
+    if (n_states == 0){
+        stop_controller_motion (self);
+        return 0;
+    }
 
     erlcm_ref_point_t list[n_states];
 
@@ -2258,7 +2263,30 @@ on_planning_thread (gpointer data) {
 
             if (!self->committed_traj){
                 fprintf(stdout, "No Committed Traj\n");
-                break;
+                int in_collision;
+                //set_rootstate (self, c_ind, &in_collision);
+
+                self->committed_traj = opttree_commit_traj (self->opttree,  self->config.commit_time , &all_committed_initial);
+
+                if(all_committed_initial) {
+                    if(self->current_goal_ind == self->goal_list->num_goals-1){
+                        self->commited_to_final_goal = TRUE;
+                    }
+                }
+
+                if (self->committed_traj) {
+                    double new_root[3] = {.0,.0,.0}; 
+                    int no_new_root = opttree_get_commit_end_point(self->opttree, self->config.commit_time , new_root);
+                    
+                    if (self->verbose_motion)
+                        fprintf(stderr," ---------- Setting new path with new root : %f,%f,%f : %d\n",
+                                new_root[0], new_root[1], new_root[2], no_new_root);
+
+                    optmain_publish_optimal_path (self, FALSE, new_root, no_new_root);
+
+                }
+
+                //break;
             }
 
             // Carry out a single iteration with the given parameters
@@ -2282,15 +2310,14 @@ on_planning_thread (gpointer data) {
                     // the cost is max and the path should be replaced as soon
                     // as a new path to the goal is found
                     double new_root[3] = {.0,.0,.0}; 
-                    int no_new_root = opttree_get_commit_end_point(self->opttree, self->config.commit_time , new_root);
+                    /* int no_new_root = opttree_get_commit_end_point(self->opttree, self->config.commit_time , new_root); */
                     
-                    if (self->verbose_motion)
-                        fprintf(stderr," ---------- Setting new path with new root : %f,%f,%f : %d\n",  
-                                new_root[0], new_root[1], new_root[2], no_new_root);  
+                    /* if (self->verbose_motion) */
+                    /*     fprintf(stderr," ---------- Setting new path with new root : %f,%f,%f : %d\n",   */
+                    /*             new_root[0], new_root[1], new_root[2], no_new_root);   */
 
-                    //optmain_publish_optimal_path (self, FALSE, new_root, no_new_root);
+                    /* optmain_publish_optimal_path (self, FALSE, new_root, no_new_root); */
                 }
-
             }
 
             // Publish the tree message if the interval is correct
