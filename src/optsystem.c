@@ -47,7 +47,7 @@
 #define DISTANCE_LIMIT 100
 
 #define DELTA_DISTANCE .25
-#define TURNING_RADIUS 0.5
+#define TURNING_RADIUS 0.1 //0.5
 #define DELTA_T 0.2             // The time interval of integration and node placement
 
 

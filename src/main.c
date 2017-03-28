@@ -107,6 +107,7 @@ typedef struct _rrtstar_t {
     gboolean verbose_traj_msg;
     gboolean continuous_map_updates;
     gboolean enable_turn_in_place;
+    gboolean perform_lazy_collision_check;
     int basic_failsafe;
     
     int num_nodes;
@@ -1236,9 +1237,10 @@ int lazy_collision_check (rrtstar_t *self) {
                         // and set the bound to max. This way, there is still a valid path
                         // to use for the committed trajectory and any other node that reaches
                         // the goal should become the new lower_bound_node
+                        node_t *parent = node_curr->parent;
                         if (!remove_node (self, node_curr)) {
                             self->opttree->lower_bound = DBL_MAX;
-                            self->opttree->lower_bound_node = node_curr->parent;
+                            self->opttree->lower_bound_node = parent;
                         }
                         g_slist_free (opttraj_nodes);
                         return 1;
@@ -1270,9 +1272,10 @@ int lazy_collision_check (rrtstar_t *self) {
                     // and set the bound to max. This way, there is still a valid path
                     // to use for the committed trajectory and any other node that reaches
                     // the goal should become the new lower_bound_node
+                    node_t *parent = node_curr->parent;
                     if (!remove_node (self, node_curr)) {
                         self->opttree->lower_bound = DBL_MAX;
-                        self->opttree->lower_bound_node = node_curr->parent;
+                        self->opttree->lower_bound_node = parent;
                     }
 
                     g_slist_free (opttraj_nodes);
@@ -2300,7 +2303,7 @@ on_planning_thread (gpointer data) {
             } 
 #endif 
 
-            if ((self->iteration_no)%100 == 0) {
+            if (self->perform_lazy_collision_check && (self->iteration_no)%100 == 0) {
                 if (lazy_collision_check (self)) {
                     if (self->verbose_motion)
                         fprintf (stdout, "Optimal trajectory is in collision\n");
@@ -2601,19 +2604,20 @@ static void usage(int argc, char ** argv)
              "RRT* motion planner\n"
              "\n"
              "Options:\n"
-             "  -s, --speed <SPEED>    Nominal speed (not functional?) \n"
-             "  -w, --width <NUM>      Additional width to add for check_gridmap (default: %.2f)\n"
-             "  -l, --local            Populate the region of the gridmap around the robot\n"
-             "                         based only on detected obstacles, ignoring SLAM occupancy map\n"
-             "  -n, --no-map           Don't use map for collision checking\n"
-             "  -c, --continuous       Update the gridmap even when not planning (?)\n"
-             "  -D, --dont-clear       Don't clear occupied cells in map when there are no corresponding laser returns\n"
-             "  -l, --large-failsafe   Use a large failsafe, which relaxes constraints\n"
-             "  -t, --trash-tree       Trash the search tree after reaching a waypoint\n"
-             "  -d, --draw             Draw path queries\n"
-             "  -N, --no-turn-in-place Disable turn in place for goals behind robot\n"
-             "  -h, --help             Print this help and exit\n"
-             "  -v, --verbose          Verbose output\n", argv[0], DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER);
+             "  -s, --speed <SPEED>                Nominal speed (not functional?) \n"
+             "  -w, --width <NUM>                  Additional width to add for check_gridmap (default: %.2f)\n"
+             "  -l, --local                        Populate the region of the gridmap around the robot\n"
+             "                                     Based only on detected obstacles, ignoring SLAM occupancy map\n"
+             "  -n, --no-map                       Don't use map for collision checking\n"
+             "  -c, --continuous                   Update the gridmap even when not planning (?)\n"
+             "  -D, --dont-clear                   Don't clear occupied cells in map when there are no corresponding laser returns\n"
+             "  -l, --large-failsafe               Use a large failsafe, which relaxes constraints\n"
+             "  -t, --trash-tree                   Trash the search tree after reaching a waypoint\n"
+             "  -d, --draw                         Draw path queries\n"
+             "  -N, --no-turn-in-place             Disable turn in place for goals behind robot\n"
+             "  -L, --perform-lazy-collision-check Perform lazy collision check of optimal trajectory\n"
+             "  -h, --help                         Print this help and exit\n"
+             "  -v, --verbose                      Verbose output\n", argv[0], DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER);
 }
 
 
@@ -2643,10 +2647,11 @@ int main (int argc, char **argv) {
     gboolean large_failsafe = FALSE; 
     gboolean clear_using_laser = TRUE; 
     gboolean enable_turn_in_place = TRUE;
+    gboolean perform_lazy_collision_check = FALSE;
     gboolean no_map = FALSE; 
     double nom_speed = 0;
     double check_gridmap_width_buffer = DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER;
-    char *optstring = "s:w:lvtcdfDnNh";
+    char *optstring = "s:w:lvtcdfDnNLh";
     char c;
     struct option long_opts[] = { 
         { "speed", required_argument, 0, 's' },
@@ -2661,6 +2666,7 @@ int main (int argc, char **argv) {
         //trash tree is broken now - fix
         { "trash-tree", no_argument, 0, 't' },
         { "no-turn-in-place", no_argument, 0, 'N' },
+        { "perform-lazy-collision-check", no_argument, 0, 'L' },
         { "help", no_argument, 0, 'h' },
         { 0, 0, 0, 0 }
     };
@@ -2712,6 +2718,10 @@ int main (int argc, char **argv) {
             enable_turn_in_place = FALSE;
             fprintf (stdout, "Disabling turn-in-place\n");
             break;
+        case 'L':
+            perform_lazy_collision_check = TRUE;
+            fprintf (stdout, "Enabling lazy collision checks\n");
+            break;
         case 'h':
             usage (argc, argv);
             return 1;
@@ -2733,6 +2743,7 @@ int main (int argc, char **argv) {
     }
     self->continuous_map_updates = continuous_map_updates;
     self->enable_turn_in_place = enable_turn_in_place;
+    self->perform_lazy_collision_check = perform_lazy_collision_check;
     fprintf (stdout, "The RRT* is alive\n");
     
     g_mutex_lock (self->plan_mutex);

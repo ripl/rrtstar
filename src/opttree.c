@@ -1421,7 +1421,7 @@ int opttree_get_commit_end_point (opttree_t *self, double time,
             input_t *input_curr = (input_t *)(input_ptr->data);
             time_total += input_curr->x[1];
             //printf ("time_total : %3.5lf \n", time_total);
-            if (time_total > time) {
+            if (time_total >= time) {
                 //fprintf(stderr, "++++++  Input Cut \n");
                 input_cut = input_curr;
                 input_cut_ptr = input_ptr; 
@@ -1565,7 +1565,7 @@ GSList* opttree_commit_traj (opttree_t *self, double time, int *all_committed) {
             input_t *input_curr = (input_t *)(input_ptr->data);
             time_total += input_curr->x[1];
             //printf ("time_total : %3.5lf \n", time_total);
-            if (time_total > time) {
+            if (time_total >= time) {
                 //fprintf(stderr, "++++++  Input Cut \n");
                 input_cut = input_curr;
                 input_cut_ptr = input_ptr; 
