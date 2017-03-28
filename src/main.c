@@ -41,7 +41,7 @@
 #include <bot_param/param_client.h>
 #include <geom_utils/convexhull.h>
 
-#define DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER 0.2
+#define DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER 0.05 //0.2
 
 #define GETCFI(key, val, prefix)                        \
     if (bot_param_get_int (config, key, val) != 0) {    \
@@ -2043,7 +2043,7 @@ on_planning_thread (gpointer data) {
 
         double time_final = 3.0;
 
-        double time_final_fail = 10.0;//20.0;
+        double time_final_fail = 20.0;
     
         fprintf(stdout,"Looking for Path\n");
         int stop_iter = 0;
@@ -2122,9 +2122,8 @@ on_planning_thread (gpointer data) {
             }
         
             if(time_diff > time_final_fail) {
-                if (self->verbose_motion)
-                    fprintf(stderr, "Failed to find solution in time_diff = %.2f > %.2f = time_final_fail. Breaking out of first while() loop.\n",
-                            time_diff, time_final_fail); 
+                fprintf(stderr, "Failed to find an initial solution in time_diff = %.2f > %.2f = time_final_fail. Breaking out of first while() loop.\n",
+                        time_diff, time_final_fail); 
                 break; 
             }
             
@@ -2253,6 +2252,11 @@ on_planning_thread (gpointer data) {
         print_committed_traj(self);
     
         double time_last_commit = time_start;
+
+        if (!self->committed_traj) {
+            fprintf (stdout, "Failed to find an initial solution\n");
+            stop_iter = 1;
+        }
     
         //improve the path 
         while ((num_iterations < iteration_limit && !all_committed_initial) 
