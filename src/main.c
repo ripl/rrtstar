@@ -2524,7 +2524,7 @@ on_planning_thread (gpointer data) {
 
                     time_last_commit = time_now;
 
-                    if(all_committed){
+                    if(all_committed && (self->opttree->lower_bound < DBL_MAX)){
                         break;
                     }
                 }
