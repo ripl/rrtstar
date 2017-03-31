@@ -2408,7 +2408,14 @@ on_planning_thread (gpointer data) {
                         self->committed_traj = opttree_commit_traj_all (self->opttree);
                     }
 
-                    if(all_committed){
+                    // When the lazy collision check detects that the
+                    // optimal path is in collision, it may initially
+                    // set the lower_bound_node to an intermediate
+                    // node along the path and set the lower bound
+                    // cost to DBL_MAX. If this node is within the
+                    // commit time, opttree_commit_traj will set
+                    // all_committed to 1. 
+                    if(all_committed && self->opttree->lower_bound < DBL_MAX){
                         if(self->current_goal_ind == self->goal_list->num_goals-1){
                             self->commited_to_final_goal = TRUE;
                         }
@@ -2471,7 +2478,14 @@ on_planning_thread (gpointer data) {
                     // Update the committed traj
                     self->committed_traj = opttree_commit_traj (self->opttree, self->config.commit_time, &all_committed);
 
-                    if(all_committed){
+                    // When the lazy collision check detects that the
+                    // optimal path is in collision, it may initially
+                    // set the lower_bound_node to an intermediate
+                    // node along the path and set the lower bound
+                    // cost to DBL_MAX. If this node is within the
+                    // commit time, opttree_commit_traj will set
+                    // all_committed to 1. 
+                    if(all_committed && self->opttree->lower_bound < DBL_MAX){
                         if(self->current_goal_ind == self->goal_list->num_goals-1){
                             self->commited_to_final_goal = TRUE;
                         }
