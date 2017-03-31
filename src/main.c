@@ -1,4 +1,3 @@
-#define ENABLE_BRANCH_AND_BOUND 1
 
 #define STOP_DIST 0.5 //3.0     //(m)
 
@@ -108,10 +107,17 @@ typedef struct _rrtstar_t {
     gboolean continuous_map_updates;
     gboolean enable_turn_in_place;
     gboolean perform_lazy_collision_check;
+    gboolean perform_branch_and_bound;
     int basic_failsafe;
     
     int num_nodes;
     double default_tv;
+
+    double lazy_collision_check_distance;
+
+
+    double lastx;
+    double lasty;
     
     int iteration_no;
     int64_t time_start;
@@ -144,7 +150,8 @@ typedef struct _rrtstar_t {
     int bot_at_end_of_committed; 
     bot_lcmgl_t *lcmgl_goal; 
     bot_lcmgl_t *lcmgl_operating_region; 
-    
+    bot_lcmgl_t *lcmgl_collision;
+
     gboolean sent_at_goal; 
     gboolean commited_to_final_goal; 
     
@@ -776,6 +783,7 @@ void read_parameters(rrtstar_t *self)
     self->config.traj_pub_time_limit =  bot_param_get_int_or_fail (self->param,"motion_planner.rrtstar.traj_pub_time_limit");
     self->config.traj_pub_final =  bot_param_get_boolean_or_fail (self->param,"motion_planner.rrtstar.traj_pub_final");
     self->default_tv = bot_param_get_double_or_fail (self->param, "motion_planner.speed_design.default_tv");
+    self->lazy_collision_check_distance = bot_param_get_double_or_fail (self->param,"motion_planner.rrtstar.lazy_collision_check_distance");
     self->config.commit_time =  bot_param_get_double_or_fail (self->param,"motion_planner.rrtstar.commit_time");
 }
 
@@ -800,7 +808,8 @@ rrtstar_t *rrtstar_create(gboolean sensing_only_local, gboolean trash_tree_on_wp
 
     self->frames = bot_frames_get_global (self->lcm, self->param);
     self->lcmgl_goal = bot_lcmgl_init (self->lcm, "RRT_STAR_CURRENT_GOAL");
-    self->lcmgl_committed_point = bot_lcmgl_init (self->lcm, "RRT_STAR_COMMITED_POINT");
+    self->lcmgl_committed_point = bot_lcmgl_init (self->lcm, "RRT_STAR_COMMITTED_POINT");
+    self->lcmgl_collision = bot_lcmgl_init (self->lcm, "RRT_STAR_COLLISION");
     self->lcmgl_operating_region = bot_lcmgl_init (self->lcm, "RRT_STAR_OR");
     //read params from config file 
     read_parameters(self);    
@@ -1145,6 +1154,7 @@ optmain_publish_optimal_path_to_old_goal (rrtstar_t *self, gboolean rampup_speed
 
 
 int remove_node (rrtstar_t *self, node_t *node_curr) {
+
     int found_new_lower_bound_node = 0;
 
     opttree_remove_branch (self->opttree, node_curr);
@@ -1207,15 +1217,17 @@ int lazy_collision_check (rrtstar_t *self) {
         int first_state = 1;
         double xlast, ylast, tlast;
         double x, y, t;
+        double dist = 0;
         GSList *opttraj_nodes_ptr = opttraj_nodes;
         struct check_path_result path_res;
         int is_forward = 1;
         int failsafe = self->opttree->optsys->failsafe_level;
-        while (opttraj_nodes_ptr) {
+        while (opttraj_nodes_ptr && (dist < self->lazy_collision_check_distance)) {
             node_t *node_curr = (node_t *)(opttraj_nodes_ptr->data);
             GSList *traj_from_parent_ptr = node_curr->traj_from_parent;
-            while (traj_from_parent_ptr) {
+            while (traj_from_parent_ptr && (dist < self->lazy_collision_check_distance)) {
                 state_t *state_this = (state_t *)(traj_from_parent_ptr->data);
+                
                 x = state_this->x[0];
                 y = state_this->x[1];
                 t = state_this->x[2];
@@ -1231,7 +1243,16 @@ int lazy_collision_check (rrtstar_t *self) {
                     //   (i)  The line-integrated cost is negative or
                     //   (ii) The maximum obstacle cost along the path exceeds a threshold
                     if ((path_res.cost < 0) || (path_res.obs_max > COMMIT_OBS_MAX_COLLISION) || (path_res.obs_max) < 0) {
-                        
+
+                        // Visualize the collision
+                        bot_lcmgl_t *lcmgl = self->lcmgl_collision;
+                        if (lcmgl) {
+                            lcmglColor3f (1.0, 0.0, 0.0);
+                            double circle[3] = {x, y, 0.0};
+                            lcmglCircle (circle, 0.2);
+                            bot_lcmgl_switch_buffer (lcmgl);
+                        }
+
                         // Remove the violating node, and if a new lower_bound_node isn't found (by remove_node),
                         // then set the previous node as the lower_bound_node,
                         // and set the bound to max. This way, there is still a valid path
@@ -1245,6 +1266,8 @@ int lazy_collision_check (rrtstar_t *self) {
                         g_slist_free (opttraj_nodes);
                         return 1;
                     }
+                    
+                    dist += sqrt (bot_sq(x-xlast) + bot_sq(y-ylast));
                 }
                 traj_from_parent_ptr = g_slist_next (traj_from_parent_ptr);
                 xlast = x;
@@ -1252,6 +1275,10 @@ int lazy_collision_check (rrtstar_t *self) {
                 tlast = t;
                 first_state = 0;
             }
+
+            if (dist >= self->lazy_collision_check_distance)
+                break;
+
             x = node_curr->state->x[0];
             y = node_curr->state->x[1];
             t = node_curr->state->x[2];
@@ -1266,6 +1293,16 @@ int lazy_collision_check (rrtstar_t *self) {
                 //   (i)  The line-integrated cost is negative or
                 //   (ii) The maximum obstacle cost along the path exceeds a threshold
                 if ((path_res.cost < 0) || (path_res.obs_max > COMMIT_OBS_MAX_COLLISION) || (path_res.obs_max) < 0) {
+                    
+
+                    // Visualize the collision
+                    bot_lcmgl_t *lcmgl = self->lcmgl_collision;
+                    if (lcmgl) {
+                        lcmglColor3f (1.0, 0.0, 0.0);
+                        double circle[3] = {x, y, 0.0};
+                        lcmglCircle (circle, 0.2);
+                        bot_lcmgl_switch_buffer (lcmgl);
+                    }
 
                     // Remove the violating node, and if a new lower_bound_node isn't found (by remove_node),
                     // then set the previous node as the lower_bound_node,
@@ -1281,7 +1318,9 @@ int lazy_collision_check (rrtstar_t *self) {
                     g_slist_free (opttraj_nodes);
                     return 1;
                 }
+                dist += sqrt (bot_sq(x-xlast) + bot_sq(y-ylast));
             }
+
             xlast = x;
             ylast = y;
             tlast = t;
@@ -2066,14 +2105,12 @@ on_planning_thread (gpointer data) {
             if ((self->iteration_no)%50000 == 0) 
                 fprintf(stdout,"At iteration number %d\n", self->iteration_no);
 
-#if ENABLE_BRANCH_AND_BOUND        
             // Every 100 iterations, if we have a solution call branch-and-bound on the tree
-            if (((self->iteration_no)%100 == 0) && (self->opttree->lower_bound_node != NULL)) {
+            if (self->perform_branch_and_bound && ((self->iteration_no)%100 == 0) && (self->opttree->lower_bound_node != NULL)) {
                 publish_tree (self);
                 opttree_branch_and_bound (self->opttree);
                 publish_tree (self);
             } 
-#endif 
 
             if ( is_bot_at_end_of_committed_traj (self) == 1 ) {
 
@@ -2224,7 +2261,7 @@ on_planning_thread (gpointer data) {
             failed_last_attempt = 0;
         }
 
-        self->committed_traj = opttree_commit_traj (self->opttree,  self->config.commit_time , &all_committed_initial);
+       self->committed_traj = opttree_commit_traj (self->opttree,  self->config.commit_time , &all_committed_initial);
 
         if(all_committed_initial){
             if(self->current_goal_ind == self->goal_list->num_goals-1){
@@ -2275,6 +2312,16 @@ on_planning_thread (gpointer data) {
 
                 self->committed_traj = opttree_commit_traj (self->opttree,  self->config.commit_time , &all_committed_initial);
 
+                // If there is still no committed trajectory, it is likely that
+                // we've reached the end of the previous trajectory and don't have
+                // a path to the goal
+                if (!self->committed_traj) {
+                    fprintf (stderr, "+++++++ Trashing the tree +++++++\n");
+                    failed_last_attempt = 1;
+                    g_mutex_unlock (self->plan_mutex);
+                    break;
+                }
+
                 if(all_committed_initial) {
                     if(self->current_goal_ind == self->goal_list->num_goals-1){
                         self->commited_to_final_goal = TRUE;
@@ -2301,11 +2348,9 @@ on_planning_thread (gpointer data) {
             num_iterations++;
             self->iteration_no = num_iterations; 
 
-#if ENABLE_BRANCH_AND_BOUND        
-            if ((self->iteration_no)%200 == 0) {
+            if (self->perform_branch_and_bound && (self->iteration_no)%200 == 0) {
                 opttree_branch_and_bound (self->opttree);
             } 
-#endif 
 
             if (self->perform_lazy_collision_check && (self->iteration_no)%100 == 0) {
                 if (lazy_collision_check (self)) {
@@ -2507,8 +2552,7 @@ on_planning_thread (gpointer data) {
     
         // Are we here because the committed trajectory was in collision? If so, reinitialize the tree
         if (((committed_in_collision) && !bot_at_goal && !stop_iter) || failed_last_attempt) {
-            fprintf(stderr, " ++++++ Committed trajectory in collision. Trashing the tree \n");
-            fprintf(stderr, "Failed reason : Failed last attempt (no collision checking done here)\n");
+            fprintf(stderr, " ++++++ Trashing the tree ++++++\n");
             opttree_reinitialize (self->opttree);
             g_mutex_unlock (self->plan_mutex);
         }
@@ -2614,7 +2658,11 @@ static void usage(int argc, char ** argv)
              "                                     Based only on detected obstacles, ignoring SLAM occupancy map\n"
              "  -n, --no-map                       Don't use map for collision checking\n"
              "  -c, --continuous                   Update the gridmap even when not planning (?)\n"
-             "  -D, --dont-clear                   Don't clear occupied cells in map when there are no corresponding laser returns\n"
+             "  -b, --branch-and-bound             Use branch and bound. This may cause bot to stop\n"
+             "                                     when lazy collision check is enabled\n"
+             "                                     and the optimal path is in collision\n"
+             "  -D, --dont-clear                   Don't clear occupied cells in map\n"
+             "                                     when there are no corresponding laser returns\n"
              "  -l, --large-failsafe               Use a large failsafe, which relaxes constraints\n"
              "  -t, --trash-tree                   Trash the search tree after reaching a waypoint\n"
              "  -d, --draw                         Draw path queries\n"
@@ -2652,10 +2700,11 @@ int main (int argc, char **argv) {
     gboolean clear_using_laser = TRUE; 
     gboolean enable_turn_in_place = TRUE;
     gboolean perform_lazy_collision_check = FALSE;
+    gboolean perform_branch_and_bound = FALSE;
     gboolean no_map = FALSE; 
     double nom_speed = 0;
     double check_gridmap_width_buffer = DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER;
-    char *optstring = "s:w:lvtcdfDnNLh";
+    char *optstring = "s:w:lvtcbdfDnNLh";
     char c;
     struct option long_opts[] = { 
         { "speed", required_argument, 0, 's' },
@@ -2665,6 +2714,7 @@ int main (int argc, char **argv) {
         { "verbose", no_argument, 0, 'v' },
         { "draw", no_argument, 0, 'd' },
         { "dont-clear", no_argument, 0, 'D' },
+        { "branch-and-bound", no_argument, 0, 'b' },
         { "large-failsafe", no_argument, 0, 'f' },
         { "continuous", no_argument, 0, 'c' },
         //trash tree is broken now - fix
@@ -2689,6 +2739,10 @@ int main (int argc, char **argv) {
         case 'l':
             sensing_only_local = TRUE;
             fprintf (stdout, "Using only sensing for local gridmap\n");
+            break;
+        case 'b':
+            perform_branch_and_bound = TRUE;
+            fprintf (stdout, "Enabling branch-and-bound\n");
             break;
         case 'n':
             no_map = TRUE;
@@ -2748,6 +2802,7 @@ int main (int argc, char **argv) {
     self->continuous_map_updates = continuous_map_updates;
     self->enable_turn_in_place = enable_turn_in_place;
     self->perform_lazy_collision_check = perform_lazy_collision_check;
+    self->perform_branch_and_bound = perform_branch_and_bound;
     fprintf (stdout, "The RRT* is alive\n");
     
     g_mutex_lock (self->plan_mutex);

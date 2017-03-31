@@ -1580,7 +1580,7 @@ GSList* opttree_commit_traj (opttree_t *self, double time, int *all_committed) {
         traj_ptr = g_slist_next (traj_ptr);
     }
 
-    if (time_total < time) {
+    if ((time_total < time) && (self->lower_bound < DBL_MAX)) {
         *all_committed = 1;
     }
     if (traj_node_curr == NULL) {

@@ -48,7 +48,7 @@
 
 #define DELTA_DISTANCE .25
 #define TURNING_RADIUS 0.1 //0.5
-#define DELTA_T 0.2             // The time interval of integration and node placement
+#define DELTA_T 0.2        // The time interval of integration and node placement
 
 
 gboolean optsystem_on_obstacle (optsystem_t *self, state_t *state);
@@ -914,7 +914,11 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
         
         double del_d = DELTA_DISTANCE;
         double del_t = del_d * TURNING_RADIUS;
-        
+
+        // Hack to avoid generating very tightly spaced reference points
+        if (del_t < 0.1)
+            del_t = 0.1;
+
         double t_inc_curr = 0.0;
 
         
