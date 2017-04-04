@@ -916,8 +916,8 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
         double del_t = del_d * TURNING_RADIUS;
 
         // Hack to avoid generating very tightly spaced reference points
-        if (del_t < 0.1)
-            del_t = 0.1;
+        if (del_t < 0.5) //0.1
+            del_t = 0.5; // 0.1
 
         double t_inc_curr = 0.0;
 
