@@ -487,7 +487,7 @@ static void update_local_goal_list(rrtstar_t *self){
         return;
 
     erlcm_goal_list_t *g_list = self->goal_list_global;
-    erlcm_goal_list_t *l_list = self->goal_list_global;
+    erlcm_goal_list_t *l_list = self->goal_list;
 
     if(l_list->num_goals != g_list->num_goals){
         fprintf(stderr, "Goal list sizes are different\n");
