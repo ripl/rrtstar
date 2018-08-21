@@ -31,7 +31,7 @@
 #include <lcm/lcm.h>
 #include <bot_core/bot_core.h>
 
-#include <lcmtypes/bot_core.h>
+#include <lcmtypes/bot2_core.h>
 #include <lcmtypes/rrtstar.h>
 #include <lcmtypes/hr_lcmtypes.h>
 #include <bot_lcmgl_client/lcmgl.h>

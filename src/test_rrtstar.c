@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <lcm/lcm.h>
 
-#include <lcmtypes/bot_core.h>
+#include <lcmtypes/bot2_core.h>
 #include <lcmtypes/hr_lcmtypes.h>
 
 static void
