@@ -21,3 +21,4 @@ pods_install_pkg_config_file(lcmtypes-rrtstar
     VERSION 0.0.1)
 
 add_subdirectory(src)
+add_subdirectory(src/renderer)

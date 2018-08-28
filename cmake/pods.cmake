@@ -26,7 +26,7 @@
 #
 # ----
 # File: pods.cmake
-# Distributed with pods version: 12.11.14
+# Distributed with pods version: 17.02.11
 
 # pods_install_headers(<header1.h> ... DESTINATION <subdir_name>)
 # 
@@ -191,14 +191,14 @@ function(pods_install_python_script script_name python_module_or_file)
         file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${script_name} 
             "#!/bin/sh\n"
             "export PYTHONPATH=${python_install_dir}:${python_old_install_dir}:\${PYTHONPATH}\n"
-            "exec ${PYTHON_EXECUTABLE} ${pods_scripts_dir}/${py_script_name} $*\n")    
+            "exec ${PYTHON_EXECUTABLE} ${pods_scripts_dir}/${py_script_name} \"$@\"\n")    
     else()
         get_filename_component(py_module ${python_module_or_file} NAME) #todo: check whether module exists?
         # write the bash script file
         file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${script_name} 
             "#!/bin/sh\n"
             "export PYTHONPATH=${python_install_dir}:${python_old_install_dir}:\${PYTHONPATH}\n"
-            "exec ${PYTHON_EXECUTABLE} -m ${py_module} $*\n")
+            "exec ${PYTHON_EXECUTABLE} -m ${py_module} \"$@\"\n")
     endif()
     # install it...
     install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/${script_name} DESTINATION bin)
@@ -309,22 +309,21 @@ macro(pods_use_pkg_config_packages target)
     string(STRIP ${_pods_pkg_ldflags} _pods_pkg_ldflags)
     #    message("ldflags: ${_pods_pkg_ldflags}")
     include_directories(${_pods_pkg_include_flags})
-    target_link_libraries(${target} ${_pods_pkg_ldflags})
     
     # make the target depend on libraries that are cmake targets
     if (_pods_pkg_ldflags)
         string(REPLACE " " ";" _split_ldflags ${_pods_pkg_ldflags})
+        target_link_libraries(${target} ${_split_ldflags})
         foreach(__ldflag ${_split_ldflags})
-                string(REGEX REPLACE "^-l" "" __depend_target_name ${__ldflag})
-                get_target_property(IS_TARGET ${__depend_target_name} LOCATION)
-                if (NOT IS_TARGET STREQUAL "IS_TARGET-NOTFOUND")
-                    #message("---- ${target} depends on  ${libname}")
-                    add_dependencies(${target} ${__depend_target_name})
-                endif() 
+            string(REGEX REPLACE "^-l" "" __depend_target_name ${__ldflag})
+            if(TARGET ${__depend_target_name})
+                #message("---- ${target} depends on  ${__depend_target_name}")
+                add_dependencies(${target} ${__depend_target_name})
+            endif()
         endforeach()
+        unset(_split_ldflags)
     endif()
-
-    unset(_split_ldflags)
+    
     unset(_pods_pkg_include_flags)
     unset(_pods_pkg_ldflags)
 endmacro()

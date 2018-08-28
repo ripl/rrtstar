@@ -78,7 +78,7 @@
 #
 # ----
 # File: lcmtypes.cmake
-# Distributed with pods version: 12.11.14
+# Distributed with pods version: 17.02.11
 
 cmake_minimum_required(VERSION 2.6.0)
 
