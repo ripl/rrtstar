@@ -7,11 +7,12 @@
 
 #include <lcmtypes/bot2_core.h>
 #include <lcmtypes/hr_lcmtypes.h>
+#include <lcmtypes/obs_lcmtypes.h>
 
 static void
 send_obs_message(lcm_t * lcm)
 {
-    erlcm_rect_list_t my_sim_obs;
+    obs_rect_list_t my_sim_obs;
     my_sim_obs.utime = 0;
 
     my_sim_obs.xy[0] = 0;
@@ -19,7 +20,7 @@ send_obs_message(lcm_t * lcm)
 
     my_sim_obs.num_rects = 2;
 
-    erlcm_rect_t *rects = (erlcm_rect_t*)calloc(2, sizeof(erlcm_rect_t));
+    obs_rect_t *rects = (obs_rect_t*)calloc(2, sizeof(obs_rect_t));
     rects[0].size[0] = 3;
     rects[0].size[1] = 3;
     rects[0].dxy[0] = -2;
@@ -35,7 +36,7 @@ send_obs_message(lcm_t * lcm)
     */
     my_sim_obs.rects = rects;
 
-    erlcm_rect_list_t_publish(lcm, "SIM_RECTS", &my_sim_obs);
+    obs_rect_list_t_publish(lcm, "SIM_RECTS", &my_sim_obs);
     free(rects);
     return;
 }
