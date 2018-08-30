@@ -407,7 +407,7 @@ void stop_controller_motion(rrtstar_t *self){
     ripl_ref_point_list_t pub = {
         .num_ref_points = 0,
         .ref_points = NULL,
-        .mode = ERLCM_REF_POINT_LIST_T_NORMAL_MOTION,
+        .mode = RIPL_REF_POINT_LIST_T_NORMAL_MOTION,
         .id = -1//self->goal_id
     };
     ripl_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
@@ -1007,7 +1007,7 @@ optmain_publish_optimal_path (rrtstar_t *self, gboolean rampup_speed,
         .num_ref_points = count,
         .commited_point_id = act_commited_node_id,
         .ref_points = list,
-        .mode = ERLCM_REF_POINT_LIST_T_NORMAL_MOTION,
+        .mode = RIPL_REF_POINT_LIST_T_NORMAL_MOTION,
         .id = self->goal_id
     };
 
@@ -1141,7 +1141,7 @@ optmain_publish_optimal_path_to_old_goal (rrtstar_t *self, gboolean rampup_speed
         .num_ref_points = count,
         .commited_point_id = act_commited_node_id,
         .ref_points = list,
-        .mode = ERLCM_REF_POINT_LIST_T_NORMAL_MOTION,
+        .mode = RIPL_REF_POINT_LIST_T_NORMAL_MOTION,
         .id = self->goal_id
     };
     ripl_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
@@ -1720,7 +1720,7 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
         ripl_ref_point_list_t pub = {
             .num_ref_points = 1,
             .ref_points = list,
-            .mode = ERLCM_REF_POINT_LIST_T_TURN_IN_PLACE,
+            .mode = RIPL_REF_POINT_LIST_T_TURN_IN_PLACE,
             .id = self->goal_id
         };
         ripl_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
@@ -1755,7 +1755,7 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
                 ripl_ref_point_list_t pub = {
                     .num_ref_points = 1,
                     .ref_points = list,
-                    .mode = ERLCM_REF_POINT_LIST_T_TURN_IN_PLACE,
+                    .mode = RIPL_REF_POINT_LIST_T_TURN_IN_PLACE,
                     .id = self->goal_id
                 };
                 ripl_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
@@ -1779,10 +1779,10 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
             usleep(50000);
             if(self->goal_status){
                 if((self->goal_id == self->goal_status->id) &&
-                   (self->goal_status->status == ERLCM_RRT_GOAL_STATUS_T_REACHED ||
-                    self->goal_status->status == ERLCM_RRT_GOAL_STATUS_T_FAILED)){
+                   (self->goal_status->status == RIPL_RRT_GOAL_STATUS_T_REACHED ||
+                    self->goal_status->status == RIPL_RRT_GOAL_STATUS_T_FAILED)){
 
-                    if(self->goal_status->status == ERLCM_RRT_GOAL_STATUS_T_FAILED){
+                    if(self->goal_status->status == RIPL_RRT_GOAL_STATUS_T_FAILED){
                         failed_rotate = 1;
                     }
 
@@ -2195,7 +2195,7 @@ on_planning_thread (gpointer data) {
                 //add a break when the robot has been stopped from outside
                 /*if(self->goal_status){
                   if((self->goal_id == self->goal_status->id) &&
-                  self->goal_status->status == ERLCM_RRT_GOAL_STATUS_T_STOPPED)){
+                  self->goal_status->status == RIPL_RRT_GOAL_STATUS_T_STOPPED)){
                   break;
                   }*/
                 //ideally we should keep improving
@@ -2602,7 +2602,7 @@ on_planning_thread (gpointer data) {
                 if(self->goal_status){
                     //break if stop is called
                     if((self->goal_id == self->goal_status->id) &&
-                       (self->goal_status->status == ERLCM_RRT_GOAL_STATUS_T_REACHED)){
+                       (self->goal_status->status == RIPL_RRT_GOAL_STATUS_T_REACHED)){
 
                         while(is_robot_moving(self)){
                             g_mutex_lock (self->stop_iter_mutex);
