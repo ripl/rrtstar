@@ -23,9 +23,9 @@
 #include <geom_utils/geometry.h>
 
 #include <lcmtypes/hr_lcmtypes.h>
-#include <lcmtypes/erlcm_rrt_command_t.h>
-#include <lcmtypes/erlcm_rrt_traj_t.h>
-#include <lcmtypes/erlcm_rrt_tree_t.h>
+#include <lcmtypes/ripl_rrt_command_t.h>
+#include <lcmtypes/ripl_rrt_traj_t.h>
+#include <lcmtypes/ripl_rrt_tree_t.h>
 #include <lcmtypes/bot_core_pose_t.h>
 
 #define RENDERER_NAME "RRT_STAR"
@@ -68,8 +68,8 @@ typedef struct _RendererRRTStar {
     
     int index_trees;
     int num_trees;
-    erlcm_rrt_tree_t *trees[MAX_HISTORY];
-    erlcm_rrt_traj_t *traj;
+    ripl_rrt_tree_t *trees[MAX_HISTORY];
+    ripl_rrt_traj_t *traj;
     int slider_history_no;
     gboolean use_const_nodes;
     int num_const_nodes;
@@ -166,7 +166,7 @@ on_clear_button(GtkWidget *button, RendererRRTStar *self)
 
     for (int i = 0; i < MAX_HISTORY; i++) 
         if (self->trees[i]) {
-            erlcm_rrt_tree_t_destroy (self->trees[i]);
+            ripl_rrt_tree_t_destroy (self->trees[i]);
             self->trees[i] = NULL;
         }
     self->num_trees = 0;
@@ -189,12 +189,12 @@ on_clear_button(GtkWidget *button, RendererRRTStar *self)
 static void
 on_start_button (GtkWidget *button, RendererRRTStar *self)
 {
-    erlcm_goal_list_t goal_list; 
+    ripl_goal_list_t goal_list; 
 
     goal_list.utime = bot_timestamp_now();
     goal_list.sender_id = 0;
     goal_list.num_goals = 1;
-    goal_list.goals = calloc(1,sizeof(erlcm_goal_t));
+    goal_list.goals = calloc(1,sizeof(ripl_goal_t));
     goal_list.goals[0].pos[0] = self->goal_mean.x;
     goal_list.goals[0].pos[1] = self->goal_mean.y;
 
@@ -215,7 +215,7 @@ on_start_button (GtkWidget *button, RendererRRTStar *self)
     goal_list.goals[0].size[0] = self->goal_std*2;//self->region_goal.size[0];
     goal_list.goals[0].size[1] = self->goal_std*2;//self->region_goal.size[0];
 
-    erlcm_goal_list_t_publish (self->lcm, "RRTSTAR_GOALS", &goal_list);
+    ripl_goal_list_t_publish (self->lcm, "RRTSTAR_GOALS", &goal_list);
     free(goal_list.goals);
     
     bot_viewer_request_redraw(self->viewer);
@@ -244,7 +244,7 @@ on_modify_goal_button (GtkWidget *button, RendererRRTStar *self)
 
 static void
 on_mp_rrt_tree (const lcm_recv_buf_t *buf, const char *channel,
-                 const erlcm_rrt_tree_t *msg, void *user) {
+                 const ripl_rrt_tree_t *msg, void *user) {
     RendererRRTStar *self = (RendererRRTStar *)user;
 
 //     printf ("Got tree message \n");
@@ -254,8 +254,8 @@ on_mp_rrt_tree (const lcm_recv_buf_t *buf, const char *channel,
 
 
     if (self->trees[self->index_trees])
-        erlcm_rrt_tree_t_destroy (self->trees[self->index_trees]);
-    self->trees[self->index_trees] = erlcm_rrt_tree_t_copy (msg);
+        ripl_rrt_tree_t_destroy (self->trees[self->index_trees]);
+    self->trees[self->index_trees] = ripl_rrt_tree_t_copy (msg);
     self->index_trees++;
     if (self->index_trees >= MAX_HISTORY)
         self->index_trees = 0;
@@ -278,14 +278,14 @@ on_mp_rrt_tree (const lcm_recv_buf_t *buf, const char *channel,
 
 static void
 on_mp_rrt_traj (const lcm_recv_buf_t *buf, const char *channel,
-                const erlcm_rrt_traj_t *msg, void *user) {
+                const ripl_rrt_traj_t *msg, void *user) {
     RendererRRTStar *self = (RendererRRTStar *)user;
 
     g_mutex_lock (self->mutex);
     
     if (self->traj) 
-        erlcm_rrt_traj_t_destroy (self->traj);
-    self->traj = erlcm_rrt_traj_t_copy (msg);
+        ripl_rrt_traj_t_destroy (self->traj);
+    self->traj = ripl_rrt_traj_t_copy (msg);
     
     g_mutex_unlock (self->mutex);
 
@@ -296,7 +296,7 @@ on_mp_rrt_traj (const lcm_recv_buf_t *buf, const char *channel,
 
 static void
 on_mp_rrt_cmd (const lcm_recv_buf_t *buf, const char *channel,
-               const erlcm_rrt_command_t *msg, void *user) {
+               const ripl_rrt_command_t *msg, void *user) {
     RendererRRTStar *self = (RendererRRTStar *)user;
 
     bot_viewer_request_redraw(self->viewer);
@@ -579,7 +579,7 @@ rrtstar_renderer_draw (BotViewer *viewer, BotRenderer *renderer) {
         int current_index = (self->index_trees - self->slider_history_no);
         while (current_index < 0)
             current_index += MAX_HISTORY;
-        erlcm_rrt_tree_t *tree = self->trees[current_index];
+        ripl_rrt_tree_t *tree = self->trees[current_index];
         glLineWidth (1.0);
 //         glColor3f (0.3,1.0,0.3);
         color_curr[0] = 0.3;
@@ -829,9 +829,9 @@ setup_renderer_rrtstar (BotViewer *viewer, int priority, lcm_t *_lcm) {
     g_signal_connect (G_OBJECT (self->pw), "changed", G_CALLBACK (on_param_widget_changed), self);
     
     // Subscribe to MP_RRT_TREE and MP_RRT_TRAJ message
-    erlcm_rrt_tree_t_subscribe (self->lcm, "RRTSTAR_TREE", on_mp_rrt_tree, self);
-    erlcm_rrt_traj_t_subscribe (self->lcm, "RRTSTAR_TRAJECTORY", on_mp_rrt_traj, self);
-    erlcm_rrt_command_t_subscribe (self->lcm, "RRTSTAR_COMMAND", on_mp_rrt_cmd, self);
+    ripl_rrt_tree_t_subscribe (self->lcm, "RRTSTAR_TREE", on_mp_rrt_tree, self);
+    ripl_rrt_traj_t_subscribe (self->lcm, "RRTSTAR_TRAJECTORY", on_mp_rrt_traj, self);
+    ripl_rrt_command_t_subscribe (self->lcm, "RRTSTAR_COMMAND", on_mp_rrt_cmd, self);
 
     // Subscribe to the POSE message
     bot_core_pose_t_subscribe (self->lcm, "POSE", on_bot_pose, self);

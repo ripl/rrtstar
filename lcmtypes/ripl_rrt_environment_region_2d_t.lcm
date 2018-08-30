@@ -1,4 +1,4 @@
-package erlcm;
+package ripl;
 
 struct rrt_environment_region_2d_t {
        

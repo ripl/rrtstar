@@ -45,10 +45,10 @@ static void
 send_goal_message(lcm_t * lcm)
 {
 
-    erlcm_goal_list_t my_goals;
+    ripl_goal_list_t my_goals;
     my_goals.num_goals = 3;
 
-    erlcm_goal_t *goal  = (erlcm_goal_t*)calloc(3, sizeof(erlcm_goal_t));
+    ripl_goal_t *goal  = (ripl_goal_t*)calloc(3, sizeof(ripl_goal_t));
     goal[0].id = 1;
     goal[0].pos[0] = 1.1;
     goal[0].pos[1] = -6.7;
@@ -68,7 +68,7 @@ send_goal_message(lcm_t * lcm)
     goal[2].size[1] = 3;
 
     my_goals.goals = goal;
-    erlcm_goal_list_t_publish(lcm, "RRTSTAR_GOALS", &my_goals);
+    ripl_goal_list_t_publish(lcm, "RRTSTAR_GOALS", &my_goals);
     free(goal);
     return;
 }

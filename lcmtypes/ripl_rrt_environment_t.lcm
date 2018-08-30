@@ -1,4 +1,4 @@
-package erlcm;
+package ripl;
 
 struct rrt_environment_t {
 

@@ -1,4 +1,4 @@
-package erlcm;
+package ripl;
 
 struct rrt_state_t {
        double x;     // X corrditate in the cartesian coordinate frame

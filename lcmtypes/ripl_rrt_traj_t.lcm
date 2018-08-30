@@ -1,4 +1,4 @@
-package erlcm;
+package ripl;
 
 struct rrt_traj_t {
        int32_t num_states;

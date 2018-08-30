@@ -1,4 +1,4 @@
-package erlcm;
+package ripl;
 
 struct ref_point_list_t {
     int32_t num_ref_points;

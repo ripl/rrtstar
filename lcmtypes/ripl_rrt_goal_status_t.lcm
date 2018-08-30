@@ -1,4 +1,4 @@
-package erlcm;
+package ripl;
 
 struct rrt_goal_status_t {
        int64_t utime; 

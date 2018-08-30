@@ -1,4 +1,4 @@
-package erlcm;
+package ripl;
 
 struct rrt_node_t {
        int32_t nodeid;
