@@ -137,7 +137,6 @@ typedef struct _rrtstar_t {
 
     ripl_goal_list_t *goal_list_global;
 
-    int goal_type; //0 -normal goal // 1 - elevator/door
     int current_goal_ind;
     int do_turn_only;
 
@@ -552,16 +551,9 @@ on_goals(const lcm_recv_buf_t * rbuf, const char *channel,
 
     convert_goal_list_to_global(self);
 
-    if (!strcmp(channel, "RRTSTAR_ELEVATOR_GOALS")) {
-        fprintf(stderr, "New elevator goal received - From Sender ID : %d\n",
+    fprintf(stdout, "New goal received - From Sender ID : %d\n",
                 (int)msg->sender_id);
-        self->goal_type = 1;
-    }
-    else if(!strcmp(channel, "RRTSTAR_GOALS")) {
-        fprintf(stderr, "New standard goal received - From Sender ID : %d\n",
-                (int)msg->sender_id);
-        self->goal_type = 0;
-    }
+
     //we should send this to the waypoint follower
     update_local_goal_list(self);
     ripl_goal_t *latest_goal = &(self->goal_list->goals[self->goal_list->num_goals-1]);
@@ -857,8 +849,6 @@ rrtstar_t *rrtstar_create(gboolean sensing_only_local, gboolean trash_tree_on_wp
 
     ripl_goal_list_t_subscribe(self->lcm, "RRTSTAR_GOALS", on_goals, self);
 
-    ripl_goal_list_t_subscribe(self->lcm, "RRTSTAR_ELEVATOR_GOALS", on_goals, self);
-
     ripl_velocity_msg_t_subscribe(self->lcm, "ROBOT_VELOCITY_STATUS", on_velocity_status, self);
     ripl_rrt_goal_status_t_subscribe(self->lcm, "TRAJECTORY_CONTROLLER_GOAL_STATUS",
                                     on_goal_status, self);
@@ -1011,11 +1001,7 @@ optmain_publish_optimal_path (rrtstar_t *self, gboolean rampup_speed,
         .id = self->goal_id
     };
 
-    if(self->goal_type == 0)
-        ripl_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
-    else if(self->goal_type == 1){
-        ripl_ref_point_list_t_publish (self->lcm, "ELEVATOR_GOAL_REF_LIST", &pub);
-    }
+    ripl_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
 
     return 1;
 }
@@ -1925,11 +1911,6 @@ void update_goal_region(rrtstar_t *self, int c_ind){
     //update the goal
     optsystem_update_goal_region (self->opttree->optsys, &goal_region);
 
-    // set goal type
-    if (self->goal_id == 1)
-        optsystem_update_goal_type (self->opttree->optsys, TRUE);
-    else
-        optsystem_update_goal_type (self->opttree->optsys, FALSE);
 }
 
 int stop_robot_in_collision_traj(rrtstar_t *self){
@@ -2011,7 +1992,6 @@ on_planning_thread (gpointer data) {
             stop_robot(self);
         }
 
-        //we need to use the same method to do turn-in-place for inside elevator
         if(self->bot_pose_last !=NULL){
             if(c_ind ==0){
                 //handle the first waypoint - either turn towards the goal if looking the other way - or turn in place

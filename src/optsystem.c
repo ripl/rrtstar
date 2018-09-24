@@ -1,5 +1,5 @@
 /*
-  This file is a part of ``RRT(*)'', an incremental 
+  This file is a part of ``RRT(*)'', an incremental
   sampling-based optimal motion planning library.
   Copyright (c) 2010 Sertac Karaman <sertac@mit.edu>, Emilio Frazzoli <frazzoli@mit.edu>
 
@@ -34,7 +34,7 @@
 
 #define ALPHA 0.5
 
-#define CONSIDER_FOOTPRINT 1 
+#define CONSIDER_FOOTPRINT 1
 #define CONSIDER_OBS_COST 0
 
 #define COLLISION_OBS_MAX_THRESHOLD 100
@@ -55,16 +55,16 @@ gboolean optsystem_on_obstacle (optsystem_t *self, state_t *state);
 
 
 
-int optsystem_extend_with_optimal_control (optsystem_t *self, state_t *state_ini, state_t *state_fin, 
+int optsystem_extend_with_optimal_control (optsystem_t *self, state_t *state_ini, state_t *state_fin,
                                            GSList **states_all_out, GSList **inputs_all_out);
 
 
-double optsystem_extend_dubins (optsystem_t *self, state_t *state_ini, state_t *state_fin, 
+double optsystem_extend_dubins (optsystem_t *self, state_t *state_ini, state_t *state_fin,
                                 int *fully_extends, GSList **states_out, GSList **inputs_out);
 
 
 // Allocates memory for and initializes an empty dynamical system
-int optsystem_new_system (optsystem_t *self, gboolean sensing_only_local, gboolean draw, 
+int optsystem_new_system (optsystem_t *self, gboolean sensing_only_local, gboolean draw,
                           gboolean clear_using_laser, gboolean sensing_only_small, double check_gridmap_width_buffer) {
 
     self->initial_state = (state_t *) malloc (sizeof(state_t));
@@ -78,7 +78,6 @@ int optsystem_new_system (optsystem_t *self, gboolean sensing_only_local, gboole
         self->grid = check_gridmap_create(0, draw, sensing_only_local, sensing_only_small, TRUE, FALSE, FALSE, check_gridmap_width_buffer);
     }
 
-    self->is_elevator = FALSE;
     return 1;
 }
 
@@ -88,16 +87,16 @@ int optsystem_free_system (optsystem_t *self) {
 
     if (self->initial_state)
         optsystem_free_state (self, self->initial_state);
-    
+
     check_gridmap_destroy (self->grid);
 
-    return 1;    
+    return 1;
 }
 
 
 // Allocates memory for a new state
 state_t* optsystem_new_state (optsystem_t *self) {
-    state_t *state = (state_t *) malloc (sizeof (state_t)); 
+    state_t *state = (state_t *) malloc (sizeof (state_t));
     for (int i = 0; i < NUM_STATES; i++)
         state->x[i] = 0.0;
     return state;
@@ -114,7 +113,7 @@ int optsystem_free_state (optsystem_t *self, state_t *state) {
 // Allocates memory for a new input
 input_t *optsystem_new_input (optsystem_t *self) {
     input_t *input = (input_t *) malloc (sizeof (input_t));
-    for (int i = 0; i < NUM_INPUTS; i++) 
+    for (int i = 0; i < NUM_INPUTS; i++)
         input->x[i] = 0.0;
     return input;
 }
@@ -147,7 +146,7 @@ input_t *optsystem_clone_input (optsystem_t *self, input_t *input) {
 
 // Sets the initial state to a particular value
 int optsystem_set_initial_state (optsystem_t *self, state_t *state) {
-    
+
     for (int i = 0; i < NUM_STATES; i++)
         self->initial_state->x[i] = state->x[i];
     return 1;
@@ -156,7 +155,7 @@ int optsystem_set_initial_state (optsystem_t *self, state_t *state) {
 
 // Returns the initial state of the system
 int  optsystem_get_initial_state (optsystem_t *self, state_t *state) {
-    for (int i = 0; i < NUM_STATES; i++) 
+    for (int i = 0; i < NUM_STATES; i++)
         state->x[i] = self->initial_state->x[i];
     return 1;
 }
@@ -168,7 +167,7 @@ int optsystem_get_num_states (optsystem_t *self) {
 }
 
 
-// Returns a double array (of size optsystem_get_num_states) 
+// Returns a double array (of size optsystem_get_num_states)
 //  used for storing the state in a spatial data structure
 double* optsystem_get_state_key (optsystem_t *self, state_t *state) {
     return  state->x;
@@ -176,34 +175,34 @@ double* optsystem_get_state_key (optsystem_t *self, state_t *state) {
 
 
 // creates a random state  -- dubins car
-int optsystem_sample_state (optsystem_t *self, state_t *random_state) { 
+int optsystem_sample_state (optsystem_t *self, state_t *random_state) {
     for (int i = 0; i < 2; i++) {
         random_state->x[i] = self->operating_region.size[i]*rand()/(RAND_MAX + 1.0)
             + self->operating_region.center[i] - self->operating_region.size[i]/2.0;
     }
     random_state->x[2] =  2* M_PI * rand()/(RAND_MAX + 1.0);
-    if ( optsystem_on_obstacle (self, random_state) ) 
-        return 0;    
+    if ( optsystem_on_obstacle (self, random_state) )
+        return 0;
     return 1;
 }
 
 
 // creates a random state near the goal  -- dubins car
-int optsystem_sample_target_state (optsystem_t *self, state_t *random_state) { 
+int optsystem_sample_target_state (optsystem_t *self, state_t *random_state) {
     for (int i = 0; i < 3; i++) {
         random_state->x[i] = self->goal_region.size[i]*rand()/(RAND_MAX + 1.0)
             + self->goal_region.center[i] - self->goal_region.size[i]/2.0;
     }
     //random_state->x[2] =  2* M_PI * rand()/(RAND_MAX + 1.0);
-    if ( optsystem_on_obstacle (self, random_state) ) 
-        return 0;    
+    if ( optsystem_on_obstacle (self, random_state) )
+        return 0;
     return 1;
 }
 
 
 // Evaluates the Euclidean distance between two states -- used mainly for the Nearest and CloseNodes procedures
 double optsystem_evaluate_distance (optsystem_t *self, state_t *state_from, state_t *state_to) {
-    
+
     double dist = 0;
     for (int i = 0; i < NUM_STATES; i++) {
         double dist_this = state_to->x[i] - state_from->x[i];
@@ -224,9 +223,9 @@ double optsystem_evaluate_distance_for_cost (optsystem_t *self, GSList *inputs, 
         time += input_curr->x[NUM_INPUTS-1];
         inputs_ptr = g_slist_next (inputs_ptr);
     }
-  
+
     double alpha_cost = (time * ALPHA /14.38  + (1.0 - ALPHA) * obstacle_cost/ 4.245797);
-    
+
     /*if(self->max_time < time){
       self->max_time = time;
       }
@@ -238,7 +237,7 @@ double optsystem_evaluate_distance_for_cost (optsystem_t *self, GSList *inputs, 
     //fprintf(stderr, "Time cost : %.2f Obst : %f\n", self->max_time , self->max_obs);
 
     if(obstacle_cost > 0){
-        //fprintf(stderr, "Time cost : %.2f Obst : %f Comb : %f\n", time, obstacle_cost, alpha_cost); 
+        //fprintf(stderr, "Time cost : %.2f Obst : %f Comb : %f\n", time, obstacle_cost, alpha_cost);
     }
 #if CONSIDER_OBS_COST
     return alpha_cost;
@@ -246,7 +245,7 @@ double optsystem_evaluate_distance_for_cost (optsystem_t *self, GSList *inputs, 
     return time;
 }
 
-int optsystem_segment_on_obstacle (optsystem_t *self, state_t *state_initial, 
+int optsystem_segment_on_obstacle (optsystem_t *self, state_t *state_initial,
                                    state_t *state_final, int num_steps, double *obstacle_cost) {
 
     check_gridmap_update(self->grid);
@@ -257,17 +256,13 @@ int optsystem_segment_on_obstacle (optsystem_t *self, state_t *state_initial,
 
     if(self->failsafe_level){
         //use increased failsafe
-        failsafe = self->failsafe_level; 
+        failsafe = self->failsafe_level;
     }
 
     //if there is a faliure also - we might increase the failsafe ??
-    
-    // Increase the failsafe for elevators
-    if (self->is_elevator == TRUE)
-        failsafe = 2;
 
     struct check_path_result path_res;
-    
+
     check_gridmap_check_path (self->grid, is_forward, failsafe,
                               state_initial->x[0], state_initial->x[1], state_initial->x[2],
                               state_final->x[0], state_final->x[1], state_final->x[2],
@@ -283,33 +278,33 @@ int optsystem_segment_on_obstacle (optsystem_t *self, state_t *state_initial,
         *obstacle_cost = DBL_MAX;
         return 1;
     }
-    else 
+    else
         *obstacle_cost = path_res.cost / 254;
-        
+
     return 0;
 
-    /* 
+    /*
      * //cost / (worst cost * steps)
      * if(path_res.obs_max == 0){
-     *     *obstacle_cost = path_res.cost / 254;    
+     *     *obstacle_cost = path_res.cost / 254;
      *     //\*obstacle_cost = path_res.obs_max/254;  //cost/ 254;
      * }
      * else{
-     *     *obstacle_cost = path_res.cost / 254;//(path_res.obs_max);// * self->grid->convolve_line_searches); 
-     *     //\*obstacle_cost = path_res.obs_max/254;  //cost / 254;//(path_res.obs_max);// * self->grid->convolve_line_searches); 
+     *     *obstacle_cost = path_res.cost / 254;//(path_res.obs_max);// * self->grid->convolve_line_searches);
+     *     //\*obstacle_cost = path_res.obs_max/254;  //cost / 254;//(path_res.obs_max);// * self->grid->convolve_line_searches);
      * }
-     * 
+     *
      * if(path_res.obs_max != 0){
      *     //fprintf(stderr, "Dist : %f Path: %f, Max : %f , Conv : %d Obstacle Cost : %f \n", distance, path_res.cost, path_res.obs_max, self->grid->convolve_line_searches, *obstacle_cost);
      * }
      * if (path_res.obs_max > 100 /\*for spread cost 200*\/ /\*10*\/ || path_res.obs_max < 0 ){ //was 10
-     * 
+     *
      *     *obstacle_cost = DBL_MAX;
      *     //Debug prints
-     * 
+     *
      *     //printf("seg path_res:\n cost %f\n restricted %f\n max %f\n obs_cost %f\n obs_restricted %f\n obs_max %f\n", path_res.cost, path_res.restricted, path_res.max, path_res.obs_cost, path_res.obs_restricted, path_res.obs_max);
-     * 
-     *     return 1;    
+     *
+     *     return 1;
      * }
      * else
      *     return 0;
@@ -344,7 +339,7 @@ state_initial->x[2]
 if (!CONSIDER_FOOTPRINT){
 
 for (int i = 0; i < num_steps; i++) {
-if ( (fabs(center[0] - state_curr[0]) <= size[0]) && (fabs(center[1] - state_curr[1]) <= size[1]) ) 
+if ( (fabs(center[0] - state_curr[0]) <= size[0]) && (fabs(center[1] - state_curr[1]) <= size[1]) )
 return 1;
 
 state_curr[0] += disc[0];
@@ -354,8 +349,8 @@ state_curr[1] += disc[1];
 }
 else{
 
-//Forklift values obtained from agile.cfg    
-//use from param 
+//Forklift values obtained from agile.cfg
+//use from param
 double width = 0.6;//4.00 / 2;
 double length = 1.0; //1.70 / 2;
 
@@ -370,7 +365,7 @@ double c_y = state_curr[1];
 c_x -= center[0];
 c_y -= center[1];
 
-// Rotate forklift rect, make it axis-aligned 
+// Rotate forklift rect, make it axis-aligned
 double cosa = cos(state_curr[2] * (180.0/M_PI));
 double sina = sin(state_curr[2] * (180.0/M_PI));
 
@@ -414,7 +409,7 @@ t = A_x; A_x = B_x; B_x = t;
 t = A_y; A_y = B_y; B_y = t;
 }
 
-// Check if B is horizontal minimum 
+// Check if B is horizontal minimum
 if (sina < 0) { B_x = -B_x; B_y = -B_y; }
 
 // If forklift is not in the horizontal range
@@ -425,12 +420,12 @@ double ext1, ext2, x, a, dx;
 // If obstacle is axis-alligned, get vertical min/max
 if (t == 0) {
 ext1 = A_y;
-ext2 = -ext1; 
+ext2 = -ext1;
 }
 // Otherwise, find vertical min/max in the range bottom left, top right
 else
 {
-x = bl_x - A_x; 
+x = bl_x - A_x;
 a = tr_x - A_x;
 ext1 = A_y;
 
@@ -455,7 +450,7 @@ ext2 *= x; ext2 /= dx; ext2 -= A_y;
 }
 }
 
-// Collision check 
+// Collision check
 if ( ! ((ext1 < bl_y && ext2 < bl_y) ||
 (ext1 > tr_y && ext2 > tr_y)) )
 return 1;
@@ -477,17 +472,17 @@ return 0;
 }
 */
 int optsystem_state_out_of_operating_region (optsystem_t *self, state_t *state_curr) {
-    
-    if  ( ( fabs(state_curr->x[0] - self->operating_region.center[0]) > self->operating_region.size[0]/2.0 ) 
-         || ( fabs(state_curr->x[1] - self->operating_region.center[1]) > self->operating_region.size[1]/2.0 ) ) 
+
+    if  ( ( fabs(state_curr->x[0] - self->operating_region.center[0]) > self->operating_region.size[0]/2.0 )
+         || ( fabs(state_curr->x[1] - self->operating_region.center[1]) > self->operating_region.size[1]/2.0 ) )
         return 1;
-    
+
     return 0;
 
 }
 
 // Extends a given state towards another state - dubins car
-int optsystem_extend_to (optsystem_t *self, state_t *state_from, state_t *state_towards, 
+int optsystem_extend_to (optsystem_t *self, state_t *state_from, state_t *state_towards,
                          int *fully_extends, GSList **states_all_out,
                          int *num_node_states, int **node_states, GSList **inputs_all_out, double *obstacle_cost_out,
                          gboolean stop_at_goal) {
@@ -499,21 +494,21 @@ int optsystem_extend_to (optsystem_t *self, state_t *state_from, state_t *state_
     GSList *states_all = NULL;
     GSList *inputs_all = NULL;
 
-    // Compute the optimal control 
+    // Compute the optimal control
     if (optsystem_extend_dubins (self, state_from, state_towards, fully_extends, &states_all, &inputs_all) == -1)
         return 0;
 
     // Check states for collision avoidance
     int num_states = 0;   // Count the number of states at the same time
     state_t *state_prev = state_from;
-    GSList *states_ptr = states_all; 
+    GSList *states_ptr = states_all;
     GSList *inputs_ptr = inputs_all;
 
     while (states_ptr && inputs_ptr) {
         num_states++;
         state_t *state_curr = (state_t *)(states_ptr->data);
         double obstacle_cost = 0;
-        if (optsystem_segment_on_obstacle (self, state_prev, state_curr, discretization_num_steps, &obstacle_cost)  || 
+        if (optsystem_segment_on_obstacle (self, state_prev, state_curr, discretization_num_steps, &obstacle_cost)  ||
             optsystem_state_out_of_operating_region (self, state_curr) ){
             // Free the states/inputs
             GSList *states_tmp = states_all;
@@ -566,12 +561,12 @@ int optsystem_extend_to (optsystem_t *self, state_t *state_from, state_t *state_
     // Assign the intermediate nodes solely with the number
     // TODO: do this time-based
     int num_node_states_tmp = (int) floor ( ((double)num_states)/((double)num_intermediate_traj + 1));
-    
+
 
     if (num_node_states_tmp > 0) {
         int *node_states_tmp = (int *) malloc (num_node_states_tmp * sizeof (int));
-        for (int i = 0; i < num_node_states_tmp; i++) 
-            node_states_tmp[i] = (i+1) * (num_intermediate_traj+1) - 1; 
+        for (int i = 0; i < num_node_states_tmp; i++)
+            node_states_tmp[i] = (i+1) * (num_intermediate_traj+1) - 1;
         *num_node_states = num_node_states_tmp;
         *node_states = node_states_tmp;
     }
@@ -581,7 +576,7 @@ int optsystem_extend_to (optsystem_t *self, state_t *state_from, state_t *state_
     }
     *states_all_out = states_all;
     *inputs_all_out = inputs_all;
-    
+
     return 1;
 }
 
@@ -605,8 +600,8 @@ gboolean optsystem_on_obstacle (optsystem_t *self, state_t *state) {
                               x2, y2, state->x[2],
                               &path_res);
 
-    /*fprintf(stderr, "Path Cost : %f, Path Max Cost : %f\n", 
-                path_res.cost, 
+    /*fprintf(stderr, "Path Cost : %f, Path Max Cost : %f\n",
+                path_res.cost,
                 path_res.max);
     */
 
@@ -614,7 +609,7 @@ gboolean optsystem_on_obstacle (optsystem_t *self, state_t *state) {
     if (path_res.max > 50 || path_res.max < 0 || path_res.cost <0){
         //fprintf(stderr,"path_res:\n cost %f\n restricted %f\n max %f\n obs_cost %f\n obs_restricted %f\n obs_max %f\n", path_res.cost, path_res.restricted, path_res.max, path_res.obs_cost, path_res.obs_restricted, path_res.obs_max);
 
-        return 1;    
+        return 1;
     }
     else{
         //fprintf(stderr,"Neg cost\n");
@@ -688,11 +683,11 @@ double ext1, ext2, x, a, dx;
 
 if (t == 0) {
 ext1 = A_y;
-ext2 = -ext1; 
+ext2 = -ext1;
 }
 else
 {
-x = bl_x - A_x; 
+x = bl_x - A_x;
 a = tr_x - A_x;
 ext1 = A_y;
 
@@ -721,7 +716,7 @@ return !((ext1 < bl_y && ext2 < bl_y) ||
 }
 else{
 if ( (fabs(obstacle_region->center[0] - state->x[0]) <= obstacle_region->size[0]/2.0) &&
-(fabs(obstacle_region->center[1] - state->x[1]) <= obstacle_region->size[1]/2.0) ) 
+(fabs(obstacle_region->center[1] - state->x[1]) <= obstacle_region->size[1]/2.0) )
 return 1;
 }
 
@@ -733,13 +728,13 @@ return 0;
 */
 
 gboolean optsystem_is_reaching_target (optsystem_t *self, state_t *state) {
-    
+
     if ( (fabs(self->goal_region.center[0] - state->x[0]) <= self->goal_region.size[0]/2.0) &&
         (fabs(self->goal_region.center[1] - state->x[1]) <= self->goal_region.size[1]/2.0)
-        && (fabs(bot_mod2pi(self->goal_region.center[2] - state->x[2])) <= self->goal_region.size[2]/2.0)){ 
+        && (fabs(bot_mod2pi(self->goal_region.center[2] - state->x[2])) <= self->goal_region.size[2]/2.0)){
         return 1;
     }
-    
+
     return 0;
 }
 
@@ -752,7 +747,7 @@ gboolean optsystem_update_obstacles (optsystem_t *self, GSList *obstacle_list) {
         self->obstacle_list = g_slist_remove (self->obstacle_list, region_curr);
         free (region_curr);
     }
-    
+
     // Add new obstacles
     GSList *obstacle_list_curr = obstacle_list;
     while (obstacle_list_curr) {
@@ -783,12 +778,6 @@ gboolean optsystem_update_goal_region (optsystem_t *self, region_3d_t *goal_regi
     return TRUE;
 }
 
-gboolean optsystem_update_goal_type (optsystem_t *self, gboolean is_elevator) {
-   
-    self->is_elevator = is_elevator;
-    return TRUE;
-}
-
 gboolean optsystem_update_operating_region (optsystem_t *self, region_2d_t *operating_region) {
 
     self->operating_region.center[0] = operating_region->center[0];
@@ -799,14 +788,14 @@ gboolean optsystem_update_operating_region (optsystem_t *self, region_2d_t *oper
     return TRUE;
 }
 
-int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1, double t_s1, 
+int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1, double t_s1,
                                      double x_s2, double y_s2, double t_s2, int comb_no,
                                      int *fully_extends, GSList **states_all, GSList **inputs_all) {
-    
+
     double x_tr = x_s2 - x_s1;
     double y_tr = y_s2 - y_s1;
     double t_tr = atan2 (y_tr, x_tr);
-    
+
     double distance = sqrt ( x_tr*x_tr + y_tr*y_tr );
 
     // The position and orientation
@@ -816,11 +805,11 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
     double x_end;
     double y_end;
     double t_end;
-    
-    if (distance > 2 * TURNING_RADIUS) {  // disks do not intersect 
+
+    if (distance > 2 * TURNING_RADIUS) {  // disks do not intersect
 
         double t_balls = acos (2 * TURNING_RADIUS / distance);
-        
+
 
         switch (comb_no) {
         case 1:
@@ -845,7 +834,7 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
     }
 
     else { // disks are intersecting
-        
+
         switch (comb_no) {
         case 1:
         case 2:
@@ -855,7 +844,7 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
             }
             return -1.0;
             break;
-            
+
         case 3:
             t_start = t_tr - M_PI_2;
             t_end = t_tr - M_PI_2;
@@ -866,7 +855,7 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
             break;
         }
     }
-    
+
     x_start = x_s1 + TURNING_RADIUS * cos (t_start);
     y_start = y_s1 + TURNING_RADIUS * sin (t_start);
     x_end = x_s2 + TURNING_RADIUS * cos (t_end);
@@ -880,38 +869,38 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
     if ( (comb_no == 1) || (comb_no == 4) ) {
         direction_s2 = -1;
     }
-    
+
     double t_increment_s1 = direction_s1 * (t_start - t_s1);
     double t_increment_s2 = direction_s2 * (t_s2 - t_end);
 
-    while (t_increment_s1 < 0) 
+    while (t_increment_s1 < 0)
         t_increment_s1 += 2.0 * M_PI;
     while (t_increment_s1 > 2.0 *M_PI)
         t_increment_s1 -= 2.0 * M_PI;
 
-    while (t_increment_s2 < 0) 
+    while (t_increment_s2 < 0)
         t_increment_s2 += 2.0 * M_PI;
     while (t_increment_s2 > 2.0 *M_PI)
         t_increment_s2 -= 2.0 * M_PI;
 
-    if  ( ( (t_increment_s1 > M_PI) && (t_increment_s2 > M_PI) ) 
+    if  ( ( (t_increment_s1 > M_PI) && (t_increment_s2 > M_PI) )
          || ( (t_increment_s1 > 3*M_PI_2) || (t_increment_s2 > 3*M_PI_2) )  ){
         return -1.0;
     }
-    
+
     double total_distance_travel = (t_increment_s1 + t_increment_s2) * TURNING_RADIUS  + distance;
-    
+
     double distance_limit = DISTANCE_LIMIT;
 
     if (fully_extends)
         *fully_extends = 0;
-    
+
     if (states_all) {
         // Generate states/inputs
-        
+
         GSList *states = NULL;
         GSList *inputs = NULL;
-        
+
         double del_d = DELTA_DISTANCE;
         double del_t = del_d * TURNING_RADIUS;
 
@@ -921,7 +910,7 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
 
         double t_inc_curr = 0.0;
 
-        
+
         while (t_inc_curr < t_increment_s1) {
             double t_inc_rel = del_t;
             t_inc_curr += del_t;
@@ -929,7 +918,7 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
                 t_inc_rel -= t_inc_curr - t_increment_s1;
                 t_inc_curr = t_increment_s1;
             }
-            
+
             state_t *state_curr = optsystem_new_state (self);
             input_t *input_curr = optsystem_new_input (self);
 
@@ -948,10 +937,10 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
             states = g_slist_prepend (states, state_curr);
             inputs = g_slist_prepend (inputs, input_curr);
 
-            if (t_inc_curr * TURNING_RADIUS > distance_limit) 
+            if (t_inc_curr * TURNING_RADIUS > distance_limit)
                 goto trajectory_complete;
         }
-        
+
         double d_inc_curr = 0.0;
         while (d_inc_curr < distance) {
             double d_inc_rel = del_d;
@@ -960,12 +949,12 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
                 d_inc_rel -= d_inc_curr - distance;
                 d_inc_curr = distance;
             }
-            
+
             state_t *state_curr = optsystem_new_state (self);
             input_t *input_curr = optsystem_new_input (self);
-            
-            state_curr->x[0] = (x_end - x_start) * d_inc_curr / distance + x_start; 
-            state_curr->x[1] = (y_end - y_start) * d_inc_curr / distance + y_start; 
+
+            state_curr->x[0] = (x_end - x_start) * d_inc_curr / distance + x_start;
+            state_curr->x[1] = (y_end - y_start) * d_inc_curr / distance + y_start;
             state_curr->x[2] = direction_s1 * t_inc_curr + t_s1 + ( (direction_s1 == 1) ? M_PI_2 : 3.0*M_PI_2);
             while (state_curr->x[2] < 0)
                 state_curr->x[2] += 2 * M_PI;
@@ -978,10 +967,10 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
             states = g_slist_prepend (states, state_curr);
             inputs = g_slist_prepend (inputs, input_curr);
 
-            if (t_inc_curr * TURNING_RADIUS + d_inc_curr > distance_limit) 
+            if (t_inc_curr * TURNING_RADIUS + d_inc_curr > distance_limit)
                 goto trajectory_complete;
         }
-        
+
         double t_inc_curr_prev = t_inc_curr;
         t_inc_curr = 0.0;
         while (t_inc_curr < t_increment_s2) {
@@ -991,19 +980,19 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
                 t_inc_rel -= t_inc_curr - t_increment_s2;
                 t_inc_curr = t_increment_s2;
             }
-            
+
             state_t *state_curr = optsystem_new_state (self);
             input_t *input_curr = optsystem_new_input (self);
 
             state_curr->x[0] = x_s2 + TURNING_RADIUS * cos (direction_s2 * (t_inc_curr - t_increment_s2) + t_s2);
             state_curr->x[1] = y_s2 + TURNING_RADIUS * sin (direction_s2 * (t_inc_curr - t_increment_s2) + t_s2);
-            state_curr->x[2] = direction_s2 * (t_inc_curr - t_increment_s2) + t_s2 
+            state_curr->x[2] = direction_s2 * (t_inc_curr - t_increment_s2) + t_s2
                 + ( (direction_s2 == 1) ?  M_PI_2 : 3.0*M_PI_2 );
             while (state_curr->x[2] < 0)
                 state_curr->x[2] += 2 * M_PI;
             while (state_curr->x[2] > 2 * M_PI)
                 state_curr->x[2] -= 2 * M_PI;
-            
+
             input_curr->x[0] = ( (comb_no == 2) || (comb_no == 3) ) ? -1 : 1;
             input_curr->x[1] = t_inc_rel * TURNING_RADIUS;
 
@@ -1022,15 +1011,15 @@ int optsystem_extend_dubins_spheres (optsystem_t *self, double x_s1, double y_s1
         *states_all = g_slist_reverse (states);
         *inputs_all = g_slist_reverse (inputs);
     }
-    
+
     return total_distance_travel;
 }
 
 
-double optsystem_extend_dubins (optsystem_t *self, state_t *state_ini, state_t *state_fin, 
+double optsystem_extend_dubins (optsystem_t *self, state_t *state_ini, state_t *state_fin,
                                 int *fully_extends, GSList **states_out, GSList **inputs_out) {
-    
-    
+
+
     // 1. Compute the centers of all four spheres
     double ti = state_ini->x[2];
     double tf = state_fin->x[2];
@@ -1038,7 +1027,7 @@ double optsystem_extend_dubins (optsystem_t *self, state_t *state_ini, state_t *
     double cos_ti = cos (-ti);
     double sin_tf = sin (-tf);
     double cos_tf = cos (-tf);
-    
+
     double si_left[3] = {
         state_ini->x[0] + TURNING_RADIUS * sin_ti,
         state_ini->x[1] + TURNING_RADIUS * cos_ti,
@@ -1059,20 +1048,20 @@ double optsystem_extend_dubins (optsystem_t *self, state_t *state_ini, state_t *
         state_fin->x[1] - TURNING_RADIUS * cos_tf,
         tf + M_PI_2
     };
-    
+
     // 2. extend all four spheres
-    double times[4]; 
-    
-    times[0] = optsystem_extend_dubins_spheres (self, si_left[0], si_left[1], si_left[2], 
+    double times[4];
+
+    times[0] = optsystem_extend_dubins_spheres (self, si_left[0], si_left[1], si_left[2],
                                                 sf_right[0], sf_right[1], sf_right[2], 1,
                                                 NULL, NULL, NULL);
-    times[1] = optsystem_extend_dubins_spheres (self, si_right[0], si_right[1], si_right[2], 
+    times[1] = optsystem_extend_dubins_spheres (self, si_right[0], si_right[1], si_right[2],
                                                 sf_left[0], sf_left[1], sf_left[2], 2,
                                                 NULL, NULL, NULL );
-    times[2] = optsystem_extend_dubins_spheres (self, si_left[0], si_left[1], si_left[2], 
+    times[2] = optsystem_extend_dubins_spheres (self, si_left[0], si_left[1], si_left[2],
                                                 sf_left[0], sf_left[1], sf_left[2], 3,
                                                 NULL, NULL, NULL );
-    times[3] = optsystem_extend_dubins_spheres (self, si_right[0], si_right[1], si_right[2], 
+    times[3] = optsystem_extend_dubins_spheres (self, si_right[0], si_right[1], si_right[2],
                                                 sf_right[0], sf_right[1], sf_right[2], 4,
                                                 NULL, NULL, NULL );
 
@@ -1084,29 +1073,29 @@ double optsystem_extend_dubins (optsystem_t *self, state_t *state_ini, state_t *
             min_time = times[i];
         }
     }
-    
+
     int res;
     switch (comb_min) {
     case 1:
-        res = optsystem_extend_dubins_spheres (self, si_left[0], si_left[1], si_left[2], 
+        res = optsystem_extend_dubins_spheres (self, si_left[0], si_left[1], si_left[2],
                                                sf_right[0], sf_right[1], sf_right[2], 1,
                                                fully_extends, states_out, inputs_out);
         return res;
-        
+
     case 2:
-        res = optsystem_extend_dubins_spheres (self, si_right[0], si_right[1], si_right[2], 
+        res = optsystem_extend_dubins_spheres (self, si_right[0], si_right[1], si_right[2],
                                                sf_left[0], sf_left[1], sf_left[2], 2,
                                                fully_extends, states_out, inputs_out);
         return res;
 
     case 3:
-        res = optsystem_extend_dubins_spheres (self, si_left[0], si_left[1], si_left[2], 
+        res = optsystem_extend_dubins_spheres (self, si_left[0], si_left[1], si_left[2],
                                                sf_left[0], sf_left[1], sf_left[2], 3,
                                                fully_extends, states_out, inputs_out);
         return res;
 
     case 4:
-        res = optsystem_extend_dubins_spheres (self, si_right[0], si_right[1], si_right[2], 
+        res = optsystem_extend_dubins_spheres (self, si_right[0], si_right[1], si_right[2],
                                                sf_right[0], sf_right[1], sf_right[2], 4,
                                                fully_extends, states_out, inputs_out);
         return res;
@@ -1122,14 +1111,14 @@ double optsystem_extend_dubins (optsystem_t *self, state_t *state_ini, state_t *
 
 double optsystem_evaluate_cost_to_go (optsystem_t *self, state_t *state) {
 
-    // TODO: This function should calculate the the cost to go from state to the goal region, 
-    //       by integrating the optimal control towards the goal region. 
+    // TODO: This function should calculate the the cost to go from state to the goal region,
+    //       by integrating the optimal control towards the goal region.
 
     // If state is in the goal region then return zero
-    if (optsystem_is_reaching_target (self, state)) 
+    if (optsystem_is_reaching_target (self, state))
         return 0.0;
 
-    // Otherwise calculate a lower bound on the cost to go 
+    // Otherwise calculate a lower bound on the cost to go
     // TODO: do the exact cost to go calculation
 
     double min_side = self->goal_region.size[0]/2.0;
@@ -1141,7 +1130,7 @@ double optsystem_evaluate_cost_to_go (optsystem_t *self, state_t *state) {
 
     dist_x = fabs(dist_x);
     dist_y = fabs(dist_y);
-    
+
     double dist = sqrt(dist_x*dist_x + dist_y*dist_y);
     if (dist_x < dist_y) {
         dist -= sqrt(1 + (dist_x/dist_y)*(dist_x/dist_y))*self->goal_region.size[0]/2.0;
@@ -1153,9 +1142,9 @@ double optsystem_evaluate_cost_to_go (optsystem_t *self, state_t *state) {
     dist-= 0.5;
     if (dist < 0.0)
         dist = 0.0;
-   
+
     //******** This is what causes the memory leak - esentially ignoring the returned extend_dubins method *****////
-    
+
     //calculate time with the extend function
 
     /*int fully_extends = 0;
@@ -1164,12 +1153,12 @@ double optsystem_evaluate_cost_to_go (optsystem_t *self, state_t *state) {
     int  *node_states = NULL;
     GSList *inputs = NULL;
     double obstacle_cost = 0;
-    
+
     state_t state_towards;
     state_towards.x[0] = self->goal_region.center[0];
     state_towards.x[1] = self->goal_region.center[1];
     state_towards.x[2] = self->goal_region.center[2];
-    
+
     // Check to see whether a path exists without considering obstacles and populate the input
     if (optsystem_extend_dubins (self, state, &state_towards, &fully_extends, &trajectory, &inputs) == -1)
         return DBL_MAX;
@@ -1185,7 +1174,7 @@ double optsystem_evaluate_cost_to_go (optsystem_t *self, state_t *state) {
 
     //assume no obstacles and use same cost metric
 #if CONSIDER_OBS_COST
-    return (time/14.38) * ALPHA + 0.0; 
+    return (time/14.38) * ALPHA + 0.0;
 #endif
 return time;*/
     return dist;

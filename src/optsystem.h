@@ -1,5 +1,5 @@
 /*
-  This file is a part of ``RRT(*)'', an incremental 
+  This file is a part of ``RRT(*)'', an incremental
   sampling-based optimal motion planning library.
   Copyright (c) 2010 Sertac Karaman <sertac@mit.edu>, Emilio Frazzoli <frazzoli@mit.edu>
 
@@ -43,7 +43,7 @@
 #define NUM_STATES 3       // Number of states
 #define NUM_INPUTS 2       // Number of inputs
 
-// Type definitions 
+// Type definitions
 typedef struct _region_2d_t region_2d_t;
 typedef struct _region_3d_t region_3d_t;
 typedef struct _state_t state_t;
@@ -52,7 +52,7 @@ typedef struct _optsystem_t optsystem_t;
 
 // Initializes the optsystem_t structure
 int
-optsystem_new_system (optsystem_t *self, gboolean sensing_only_local, gboolean draw, 
+optsystem_new_system (optsystem_t *self, gboolean sensing_only_local, gboolean draw,
                       gboolean clear_using_laser, gboolean sensing_only_small, double check_gridmap_width_buffer);
 
 // Frees the memory allocated for elements of the optsystem_t structure
@@ -72,89 +72,84 @@ input_t*
 optsystem_new_input (optsystem_t *self);
 
 // Frees the memory allocated for an input
-int 
+int
 optsystem_free_input (optsystem_t *self, input_t *input);
 
-// Allocates memory for a new state. Copies a given state into the new state 
+// Allocates memory for a new state. Copies a given state into the new state
 //   and returns a pointer to the new state
 state_t*
 optsystem_clone_state (optsystem_t *self, state_t *state);
 
-// Allocates memory for a new input. Copies a given input into the new input 
+// Allocates memory for a new input. Copies a given input into the new input
 //   and returns a pointer to the new input
 input_t*
 optsystem_clone_input (optsystem_t *self, input_t *input);
 
 // Sets the initial state to a given state_t structure
-int 
+int
 optsystem_set_initial_state (optsystem_t *self, state_t *state);
 
 // Copies the initial state to the given state_t structure
-int 
+int
 optsystem_get_initial_state (optsystem_t *self, state_t *state);
 
 // Returns the number of states
 int
 optsystem_get_num_states (optsystem_t *self);
 
-// Returns a key to the state for the kd-tree implementation. The return 
+// Returns a key to the state for the kd-tree implementation. The return
 //   value must be a double array of size equal to the number of states
 double*
 optsystem_get_state_key (optsystem_t *self, state_t *state);
 
-// Returns a new sample state from the free-space 
-int 
+// Returns a new sample state from the free-space
+int
 optsystem_sample_state (optsystem_t *self, state_t *random_state);
 
 // Returns a new sample state from the target state
-int 
+int
 optsystem_sample_target_state (optsystem_t *self, state_t *random_state);
 
 // Evaluates the distance between two given states for nearest neighbors computation
-double 
+double
 optsystem_evaluate_distance (optsystem_t *self, state_t *state_from, state_t *state_to);
 
 // Evaluates the cost of a given trajectory
-double 
+double
 optsystem_evaluate_distance_for_cost (optsystem_t *self, GSList *inputs, double obstacle_cost);
 
-// Extends a given state (state_from) towards a given state (state_towards). Sets 
+// Extends a given state (state_from) towards a given state (state_towards). Sets
 //   (fully_extend) to 1 if the extension exactly reaches to state_towards and to 0
-//   if the extension falls short. The resulting sequence of states is returned in 
+//   if the extension falls short. The resulting sequence of states is returned in
 //   (trajectory) and the resulting inputs is returned in (inputs). The intermediate
 //   nodes to be put into the tree is returned in (node_states), while the number of
 //   such nodes is teruned in (num_node_states). If (stop_at_goal) is set to 1, the
-//   function will return partial sequences of states (trajectory), inputs (inputs), 
+//   function will return partial sequences of states (trajectory), inputs (inputs),
 //   and nodes (node_states) if the trajectory from (state_from) reaches the goal
 //   along the way to (state_towards).
-int 
-optsystem_extend_to (optsystem_t *self, state_t *state_from, state_t *state_towards, 
+int
+optsystem_extend_to (optsystem_t *self, state_t *state_from, state_t *state_towards,
                      int *fully_extends, GSList **trajectory, int *num_node_states, int **node_states, GSList **inputs, double *obstacle_cost_out,
                      gboolean stop_at_goal);
 
 // Returns true iff the given state reaches the goal
-gboolean 
+gboolean
 optsystem_is_reaching_target (optsystem_t *self, state_t *state);
 
 
 // ===========   Environment interface    =============================================
 // Updates the operating region
-gboolean 
+gboolean
 optsystem_update_operating_region (optsystem_t *self, region_2d_t *operating_region);
 
 // Updates the goal region
-gboolean 
+gboolean
 optsystem_update_goal_region (optsystem_t *self, region_3d_t *goal_region);
 
-// Updates the goal type
-gboolean 
-optsystem_update_goal_type (optsystem_t *self, gboolean is_elevator);
-
-
-gboolean 
+gboolean
 optsystem_update_goal_region_with_heading (optsystem_t *self, region_2d_t *goal_region, double goal_heading, double goal_heading_size);
 // Updates the list of obstacles
-gboolean 
+gboolean
 optsystem_update_obstacles (optsystem_t *self, GSList *obstacle_list);
 
 // A 2D region to describe operating and goal regions as well as obstacles
@@ -163,7 +158,7 @@ struct _region_2d_t {
     double size[2];
 };
 
-// A 2D region to describe goal region with heading 
+// A 2D region to describe goal region with heading
 struct _region_3d_t {
     double center[3];
     double size[3];
@@ -185,7 +180,7 @@ struct _optsystem_t {
 
     // Initial state
     state_t *initial_state;
-    
+
     // Operating region
     region_2d_t operating_region;
 
@@ -198,14 +193,13 @@ struct _optsystem_t {
     // Gridmap
     check_gridmap_t *grid;
 
-    double max_time; 
-    double max_obs; 
+    double max_time;
+    double max_obs;
 
-    gboolean is_elevator;
     int failsafe_level;
 };
 
-double 
+double
 optsystem_evaluate_cost_to_go (optsystem_t *self, state_t *state);
 
 
