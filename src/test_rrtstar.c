@@ -8,6 +8,7 @@
 #include <lcmtypes/bot2_core.h>
 #include <lcmtypes/hr_lcmtypes.h>
 #include <lcmtypes/obs_lcmtypes.h>
+#include <lcmtypes/rrtstar_lcmtypes.h>
 
 static void
 send_obs_message(lcm_t * lcm)

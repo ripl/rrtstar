@@ -15,15 +15,15 @@
 
 #include <lcm/lcm.h>
 #include <bot_core/bot_core.h>
+#include <bot_param/param_client.h>
+#include <geom_utils/convexhull.h>
 
 #include <lcmtypes/bot2_core.h>
-#include <lcmtypes/rrtstar.h>
+#include <lcmtypes/rrtstar_lcmtypes.h>
 #include <lcmtypes/hr_lcmtypes.h>
 #include <bot_lcmgl_client/lcmgl.h>
 
 #include "opttree.h"
-#include <bot_param/param_client.h>
-#include <geom_utils/convexhull.h>
 
 #define DEFAULT_CHECK_GRIDMAP_WIDTH_BUFFER 0.05 //0.2
 #define BOT_AT_GOAL_TIGHT_DIST 0.4 // NOT CURRENTLY USED
