@@ -15,6 +15,7 @@ pods_use_pkg_config_packages(rrtstar
     bot2-core
     lcmtypes_rrtstar
     lcmtypes_hr-lcmtypes
+    lcmtypes_map
     #lcmtypes_obstacle-detector
     bot2-param-client
     #geom-utils

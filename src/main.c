@@ -21,6 +21,7 @@
 #include <lcmtypes/bot2_core.h>
 #include <lcmtypes/rrtstar_lcmtypes.h>
 #include <lcmtypes/ripl_goal_list_t.h>
+#include <lcmtypes/ripl_speech_cmd_t.h>
 #include <bot_lcmgl_client/lcmgl.h>
 
 #include "opttree.h"
