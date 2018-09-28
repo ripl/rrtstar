@@ -15,9 +15,9 @@ pods_use_pkg_config_packages(rrtstar
     bot2-core
     lcmtypes_rrtstar
     lcmtypes_hr-lcmtypes
-    lcmtypes_obstacle-detector
+    #lcmtypes_obstacle-detector
     bot2-param-client
-    geom-utils
+    #geom-utils
     check_gridmap)
 
 # make exeutables public
@@ -25,15 +25,15 @@ pods_install_executables(rrtstar)
 
 
 
-add_executable(testrrtstar
-    test_rrtstar.c)
-
-pods_use_pkg_config_packages(testrrtstar
-    lcm
-    glib-2.0
-    bot2-core
-    lcmtypes_rrtstar
-    lcmtypes_hr-lcmtypes)
-
-# make exeutables public
-pods_install_executables(testrrtstar)
+# add_executable(testrrtstar
+#     test_rrtstar.c)
+#
+# pods_use_pkg_config_packages(testrrtstar
+#     lcm
+#     glib-2.0
+#     bot2-core
+#     lcmtypes_rrtstar
+#     lcmtypes_hr-lcmtypes)
+#
+# # make exeutables public
+# pods_install_executables(testrrtstar)

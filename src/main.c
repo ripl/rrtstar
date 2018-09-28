@@ -16,11 +16,11 @@
 #include <lcm/lcm.h>
 #include <bot_core/bot_core.h>
 #include <bot_param/param_client.h>
-#include <geom_utils/convexhull.h>
+//#include <geom_utils/convexhull.h>
 
 #include <lcmtypes/bot2_core.h>
 #include <lcmtypes/rrtstar_lcmtypes.h>
-#include <lcmtypes/hr_lcmtypes.h>
+#include <lcmtypes/ripl_goal_list_t.h>
 #include <bot_lcmgl_client/lcmgl.h>
 
 #include "opttree.h"
@@ -138,7 +138,6 @@ typedef struct _rrtstar_t {
     int current_goal_ind;
     int do_turn_only;
 
-    ripl_velocity_msg_t *vel_status;
     int bot_at_end_of_committed;
     bot_lcmgl_t *lcmgl_goal;
     bot_lcmgl_t *lcmgl_operating_region;
@@ -300,11 +299,19 @@ is_bot_near_goal (rrtstar_t *self, ripl_goal_t *latest_goal) {
 
 int
 is_robot_moving( rrtstar_t *self){
-    if(self->vel_status !=NULL){
+    if(self->bot_pose_last !=NULL){
+
+        double vel_body[3];
+        double rate_body[3];
+
+        bot_frames_transform_vec (self->frames, "local", "body", self->bot_pose_last->vel, vel_body);
+
+        bot_frames_transform_vec (self->frames, "local", "body", self->bot_pose_last->rotation_rate, rate_body);
+
         if(self->verbose_motion)
-            fprintf(stdout,"TV :%f RV :%f\n", self->vel_status->tv, self->vel_status->rv);
-        if(fabs(self->vel_status->tv) < self->config.tv_stopped_threshold &&
-           fabs(self->vel_status->rv) < self->config.rv_stopped_threshold)
+            fprintf(stdout,"TV :%f RV :%f\n", vel_body[0], rate_body[2]);
+        if(fabs(vel_body[0]) < self->config.tv_stopped_threshold &&
+           fabs(rate_body[2]) < self->config.rv_stopped_threshold)
             return 0;
         else
             return 1;
@@ -386,16 +393,6 @@ on_goal_status (const lcm_recv_buf_t *buf, const char *channel,
         ripl_rrt_goal_status_t_destroy(self->goal_status);
     }
     self->goal_status = ripl_rrt_goal_status_t_copy(msg);
-}
-
-static void
-on_velocity_status (const lcm_recv_buf_t *buf, const char *channel,
-                    const ripl_velocity_msg_t *msg, void *user){
-    rrtstar_t *self = (rrtstar_t*) user;
-    if(self->vel_status !=NULL){
-        ripl_velocity_msg_t_destroy(self->vel_status);
-    }
-    self->vel_status = ripl_velocity_msg_t_copy(msg);
 }
 
 
@@ -760,7 +757,6 @@ rrtstar_t *rrtstar_create(gboolean sensing_only_local, gboolean trash_tree_on_wp
 
     ripl_goal_list_t_subscribe(self->lcm, "RRTSTAR_GOALS", on_goals, self);
 
-    ripl_velocity_msg_t_subscribe(self->lcm, "ROBOT_VELOCITY_STATUS", on_velocity_status, self);
     ripl_rrt_goal_status_t_subscribe(self->lcm, "TRAJECTORY_CONTROLLER_GOAL_STATUS",
                                     on_goal_status, self);
 
