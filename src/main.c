@@ -2452,7 +2452,7 @@ on_planning_thread (gpointer data) {
         if (((committed_in_collision) && !bot_at_goal && !stop_iter) || failed_last_attempt) {
             fprintf(stderr, " ++++++ Trashing the tree ++++++\n");
             opttree_reinitialize (self->opttree);
-            g_mutex_unlock (self->plan_mutex);
+            //g_mutex_unlock (self->plan_mutex); // causes segfault since the mutex appears to be unlocked above
         }
         else if((self->current_goal_ind < (self->goal_list->num_goals-1) && !self->trash_tree_on_wp) && !bot_at_goal && !stop_iter){
             if(second_failure){
