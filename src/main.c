@@ -305,14 +305,14 @@ is_robot_moving( rrtstar_t *self){
         double vel_body[3];
         double rate_body[3];
 
-        bot_frames_transform_vec (self->frames, "local", "body", self->bot_pose_last->vel, vel_body);
+        bot_frames_rotate_vec (self->frames, "local", "body", self->bot_pose_last->vel, vel_body);
 
-        bot_frames_transform_vec (self->frames, "local", "body", self->bot_pose_last->rotation_rate, rate_body);
+        bot_frames_rotate_vec (self->frames, "local", "body", self->bot_pose_last->rotation_rate, rate_body);
 
         if(self->verbose_motion)
             fprintf(stdout,"TV :%f RV :%f\n", vel_body[0], rate_body[2]);
         if(fabs(vel_body[0]) < self->config.tv_stopped_threshold &&
-           fabs(rate_body[2]) < self->config.rv_stopped_threshold)
+            fabs(rate_body[2]) < self->config.rv_stopped_threshold)
             return 0;
         else
             return 1;
