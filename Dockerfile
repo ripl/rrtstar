@@ -26,10 +26,6 @@ RUN cd ${WORKING_DIR}/obstacle-detector-lcmtypes/ && BUILD_PREFIX=$RRTSTAR_INSTA
 RUN git clone https://github.com/ripl-ttic/map-lcmtypes ${WORKING_DIR}/map-lcmtypes
 RUN cd ${WORKING_DIR}/map-lcmtypes/ && BUILD_PREFIX=$RRTSTAR_INSTALL_DIR make -j
 
-# general lcmtypes
-RUN git clone -b husky https://github.com/ripl-ttic/lcmtypes ${WORKING_DIR}/lcmtypes
-RUN cd ${WORKING_DIR}/lcmtypes/ && BUILD_PREFIX=$RRTSTAR_INSTALL_DIR make -j
-
 # geom-utils
 RUN git clone https://github.com/ripl-ttic/geom-utils ${WORKING_DIR}/geom-utils
 RUN cd ${WORKING_DIR}/geom-utils/ && BUILD_PREFIX=$RRTSTAR_INSTALL_DIR make -j

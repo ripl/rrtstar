@@ -21,7 +21,6 @@
 #include <lcmtypes/bot2_core.h>
 #include <lcmtypes/rrtstar_lcmtypes.h>
 #include <lcmtypes/ripl_goal_list_t.h>
-#include <lcmtypes/ripl_speech_cmd_t.h>
 #include <bot_lcmgl_client/lcmgl.h>
 
 #include "opttree.h"
@@ -50,6 +49,7 @@
 typedef struct _rrt_config_t {
     int iteration_limit;       // Limit on the number of iterations that the algorithm is run for
     int time_limit;            // Limit on the time that the algorithm run for
+                               // Doesn't seem to be used
 
     // Tree publish interval
     int tree_pub_iteration_limit;
@@ -421,15 +421,6 @@ get_unique_id_32t (void)
     return (0xefffffff&(bot_timestamp_now()<<8)) + 256*rand()/RAND_MAX;
 }
 
-void estop_controller (rrtstar_t *self) {
-    ripl_speech_cmd_t msg = {
-        .utime = bot_timestamp_now(),
-        .cmd_type = "FOLLOWER",
-        .cmd_property = "STOP",
-    };
-    ripl_speech_cmd_t_publish (self->lcm, "WAYPOINT_NAVIGATOR", &msg);
-}
-
 
 // If we get a new goal list, we currently stop the robot and stop searching.
 // We should instead adapt the tree according to the new goal (i.e., identify
@@ -481,11 +472,11 @@ on_goals(const lcm_recv_buf_t * rbuf, const char *channel,
 
         fprintf(stderr, "+++++ We are at the goal - not checking for orientation\n");
 
-        ripl_speech_cmd_t msg;
+        ripl_rrt_goal_status_t msg;
         msg.utime = bot_timestamp_now();
-        msg.cmd_type = "WAYPOINT_STATUS";
-        msg.cmd_property = "REACHED";
-        ripl_speech_cmd_t_publish (self->lcm, "WAYPOINT_STATUS", &msg);
+        msg.utime = self->current_goal_ind;
+        msg.status = RIPL_RRT_GOAL_STATUS_T_REACHED;
+        ripl_rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
 
         return;
     }
@@ -1702,16 +1693,17 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
     if(no_planning){
         fprintf(stderr, "Done turning - stop the loop and go back to the start. Robot has arrived at the current goal\n");
 
-        ripl_speech_cmd_t msg;
+        ripl_rrt_goal_status_t msg;
         msg.utime = bot_timestamp_now();
-        msg.cmd_type = "WAYPOINT_STATUS";
+        msg.utime = self->current_goal_ind;
         if(failed_rotate){
-            msg.cmd_property = "FAILED";
+            msg.status = RIPL_RRT_GOAL_STATUS_T_REACHED;
         }
         else{
-            msg.cmd_property = "REACHED";
+            msg.status = RIPL_RRT_GOAL_STATUS_T_REACHED;
         }
-        ripl_speech_cmd_t_publish (self->lcm, "WAYPOINT_STATUS", &msg);
+
+        ripl_rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
 
         g_mutex_lock(self->running_mutex);
         self->is_running = 0;
@@ -1830,7 +1822,7 @@ int stop_robot_in_collision_traj(rrtstar_t *self){
         if(stop_iter){
             break;
         }
-        estop_controller (self);
+        stop_controller_motion (self);
         fprintf (stdout, "Telling the bot to stop\n");
         usleep(50000);
     }
@@ -2075,18 +2067,25 @@ on_planning_thread (gpointer data) {
 
         //now we need to wait until the robot has reached the end of the committed trajctory
         if(c_ind > 0 && self->committed_traj && !stop_iter){
+
+            ripl_rrt_goal_status_t msg;
+            msg.utime = bot_timestamp_now();
+            msg.utime = self->current_goal_ind;
+            msg.status = RIPL_RRT_GOAL_STATUS_T_ACTIVE;
+            ripl_rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
+
+            int wait_count = 0;
+
             while(!(is_bot_at_end_of_committed_traj (self)==1) && !stop_iter){
                 g_mutex_lock (self->stop_iter_mutex);
                 stop_iter = self->stop_iter;
                 g_mutex_unlock (self->stop_iter_mutex);
 
-                //add a break when the robot has been stopped from outside
-                /*if(self->goal_status){
-                  if((self->goal_id == self->goal_status->id) &&
-                  self->goal_status->status == RIPL_RRT_GOAL_STATUS_T_STOPPED)){
-                  break;
-                  }*/
-                //ideally we should keep improving
+                wait_count++;
+
+                if(wait_count%100){
+                    fprintf(stdout, "Waiting for bot to reach committed traj point\n");
+                }
                 usleep(50000);
             }
             //free the committed traj
@@ -2311,7 +2310,7 @@ on_planning_thread (gpointer data) {
                     if (committed_in_collision) {
                         fprintf (stdout, "Committed trajectory is in collision. Telling the bot to stop\n");
                         while (is_robot_moving (self)) {
-                            estop_controller (self);
+                            stop_controller_motion (self);
                             usleep(50000);
                         }
 
@@ -2467,13 +2466,12 @@ on_planning_thread (gpointer data) {
         else{
 
             if(second_failure && (self->current_goal_ind == (self->goal_list->num_goals-1))){
-                fprintf(stderr,"Second faliure on the last goal - send out failed to get to goal msg - stopping\n");
-                 ripl_speech_cmd_t msg;
-                 msg.utime = bot_timestamp_now();
-                 msg.cmd_type = "WAYPOINT_STATUS";
-                 msg.cmd_property = "FAILED";
-                 ripl_speech_cmd_t_publish (self->lcm, "WAYPOINT_STATUS", &msg);
-
+                fprintf(stderr,"Second failure on the last goal - send out failed to get to goal msg - stopping\n");
+                ripl_rrt_goal_status_t msg;
+                msg.utime = bot_timestamp_now();
+                msg.utime = self->current_goal_ind;
+                msg.status = RIPL_RRT_GOAL_STATUS_T_FAILED;
+                ripl_rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
             }
 
             int stop_iter = 0;
@@ -2505,11 +2503,11 @@ on_planning_thread (gpointer data) {
                         if(self->publish_waypoint_status){
                             fprintf(stdout, "Robot has arrived at the current goal\n");
 
-                            ripl_speech_cmd_t msg;
+                            ripl_rrt_goal_status_t msg;
                             msg.utime = bot_timestamp_now();
-                            msg.cmd_type = "WAYPOINT_STATUS";
-                            msg.cmd_property = "REACHED";
-                            ripl_speech_cmd_t_publish (self->lcm, "WAYPOINT_STATUS", &msg);
+                            msg.utime = self->current_goal_ind;
+                            msg.status = RIPL_RRT_GOAL_STATUS_T_REACHED;
+                            ripl_rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
                         }
 
                         fprintf(stderr, "Robot Stopped - Publishing waypoint status\n");

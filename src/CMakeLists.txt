@@ -14,7 +14,6 @@ pods_use_pkg_config_packages(rrtstar
     glib-2.0
     bot2-core
     lcmtypes_rrtstar
-    lcmtypes_hr-lcmtypes
     bot2-param-client
     check_gridmap)
 
