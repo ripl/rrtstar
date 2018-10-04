@@ -15,7 +15,7 @@ pods_use_pkg_config_packages(rrtstar
     bot2-core
     lcmtypes_rrtstar
     bot2-param-client
-    check_gridmap)
+    check-gridmap)
 
 # make exeutables public
 pods_install_executables(rrtstar)
