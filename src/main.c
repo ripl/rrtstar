@@ -305,9 +305,9 @@ is_robot_moving( rrtstar_t *self){
         double vel_body[3];
         double rate_body[3];
 
-        bot_frames_transform_vec (self->frames, "local", "body", self->bot_pose_last->vel, vel_body);
+        bot_frames_rotate_vec (self->frames, "local", "body", self->bot_pose_last->vel, vel_body);
 
-        bot_frames_transform_vec (self->frames, "local", "body", self->bot_pose_last->rotation_rate, rate_body);
+        bot_frames_rotate_vec (self->frames, "local", "body", self->bot_pose_last->rotation_rate, rate_body);
 
         if(self->verbose_motion)
             fprintf(stdout,"TV :%f RV :%f\n", vel_body[0], rate_body[2]);
@@ -2203,7 +2203,7 @@ on_planning_thread (gpointer data) {
                 if (!self->committed_traj) {
                     fprintf (stderr, "+++++++ Trashing the tree +++++++\n");
                     failed_last_attempt = 1;
-                    g_mutex_unlock (self->plan_mutex);
+                    //g_mutex_unlock (self->plan_mutex);
                     break;
                 }
 
