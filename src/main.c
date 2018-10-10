@@ -402,7 +402,7 @@ void stop_controller_motion(rrtstar_t *self){
     rrt_ref_point_list_t pub = {
         .num_ref_points = 0,
         .ref_points = NULL,
-        .mode = RIPL_REF_POINT_LIST_T_NORMAL_MOTION,
+        .mode = RRT_REF_POINT_LIST_T_NORMAL_MOTION,
         .id = -1//self->goal_id
     };
     rrt_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
@@ -475,7 +475,7 @@ on_goals(const lcm_recv_buf_t * rbuf, const char *channel,
         rrt_goal_status_t msg;
         msg.utime = bot_timestamp_now();
         msg.utime = self->current_goal_ind;
-        msg.status = RIPL_RRT_GOAL_STATUS_T_REACHED;
+        msg.status = RRT_GOAL_STATUS_T_REACHED;
         rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
 
         return;
@@ -896,7 +896,7 @@ optmain_publish_optimal_path (rrtstar_t *self, gboolean rampup_speed,
         .num_ref_points = count,
         .commited_point_id = act_commited_node_id,
         .ref_points = list,
-        .mode = RIPL_REF_POINT_LIST_T_NORMAL_MOTION,
+        .mode = RRT_REF_POINT_LIST_T_NORMAL_MOTION,
         .id = self->goal_id
     };
 
@@ -1026,7 +1026,7 @@ optmain_publish_optimal_path_to_old_goal (rrtstar_t *self, gboolean rampup_speed
         .num_ref_points = count,
         .commited_point_id = act_commited_node_id,
         .ref_points = list,
-        .mode = RIPL_REF_POINT_LIST_T_NORMAL_MOTION,
+        .mode = RRT_REF_POINT_LIST_T_NORMAL_MOTION,
         .id = self->goal_id
     };
     rrt_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
@@ -1605,7 +1605,7 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
         rrt_ref_point_list_t pub = {
             .num_ref_points = 1,
             .ref_points = list,
-            .mode = RIPL_REF_POINT_LIST_T_TURN_IN_PLACE,
+            .mode = RRT_REF_POINT_LIST_T_TURN_IN_PLACE,
             .id = self->goal_id
         };
         rrt_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
@@ -1640,7 +1640,7 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
                 rrt_ref_point_list_t pub = {
                     .num_ref_points = 1,
                     .ref_points = list,
-                    .mode = RIPL_REF_POINT_LIST_T_TURN_IN_PLACE,
+                    .mode = RRT_REF_POINT_LIST_T_TURN_IN_PLACE,
                     .id = self->goal_id
                 };
                 rrt_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
@@ -1664,10 +1664,10 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
             usleep(50000);
             if(self->goal_status){
                 if((self->goal_id == self->goal_status->id) &&
-                   (self->goal_status->status == RIPL_RRT_GOAL_STATUS_T_REACHED ||
-                    self->goal_status->status == RIPL_RRT_GOAL_STATUS_T_FAILED)){
+                   (self->goal_status->status == RRT_GOAL_STATUS_T_REACHED ||
+                    self->goal_status->status == RRT_GOAL_STATUS_T_FAILED)){
 
-                    if(self->goal_status->status == RIPL_RRT_GOAL_STATUS_T_FAILED){
+                    if(self->goal_status->status == RRT_GOAL_STATUS_T_FAILED){
                         failed_rotate = 1;
                     }
 
@@ -1697,10 +1697,10 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
         msg.utime = bot_timestamp_now();
         msg.utime = self->current_goal_ind;
         if(failed_rotate){
-            msg.status = RIPL_RRT_GOAL_STATUS_T_REACHED;
+            msg.status = RRT_GOAL_STATUS_T_REACHED;
         }
         else{
-            msg.status = RIPL_RRT_GOAL_STATUS_T_REACHED;
+            msg.status = RRT_GOAL_STATUS_T_REACHED;
         }
 
         rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
@@ -2071,7 +2071,7 @@ on_planning_thread (gpointer data) {
             rrt_goal_status_t msg;
             msg.utime = bot_timestamp_now();
             msg.utime = self->current_goal_ind;
-            msg.status = RIPL_RRT_GOAL_STATUS_T_ACTIVE;
+            msg.status = RRT_GOAL_STATUS_T_ACTIVE;
             rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
 
             int wait_count = 0;
@@ -2380,7 +2380,7 @@ on_planning_thread (gpointer data) {
                     if (committed_in_collision) {
                         fprintf (stdout, "Committed trajectory is in collision. Telling the bot to stop\n");
                         while (is_robot_moving (self)) {
-                            estop_controller (self);
+                            stop_controller_motion (self);
                             usleep(50000);
                         }
 
@@ -2470,7 +2470,7 @@ on_planning_thread (gpointer data) {
                 rrt_goal_status_t msg;
                 msg.utime = bot_timestamp_now();
                 msg.utime = self->current_goal_ind;
-                msg.status = RIPL_RRT_GOAL_STATUS_T_FAILED;
+                msg.status = RRT_GOAL_STATUS_T_FAILED;
                 rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
             }
 
@@ -2486,7 +2486,7 @@ on_planning_thread (gpointer data) {
                 if(self->goal_status){
                     //break if stop is called
                     if((self->goal_id == self->goal_status->id) &&
-                       (self->goal_status->status == RIPL_RRT_GOAL_STATUS_T_REACHED)){
+                       (self->goal_status->status == RRT_GOAL_STATUS_T_REACHED)){
 
                         while(is_robot_moving(self)){
                             g_mutex_lock (self->stop_iter_mutex);
@@ -2506,7 +2506,7 @@ on_planning_thread (gpointer data) {
                             rrt_goal_status_t msg;
                             msg.utime = bot_timestamp_now();
                             msg.utime = self->current_goal_ind;
-                            msg.status = RIPL_RRT_GOAL_STATUS_T_REACHED;
+                            msg.status = RRT_GOAL_STATUS_T_REACHED;
                             rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
                         }
 
