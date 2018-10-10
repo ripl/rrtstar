@@ -2202,7 +2202,7 @@ on_planning_thread (gpointer data) {
                 if (!self->committed_traj) {
                     fprintf (stderr, "+++++++ Trashing the tree +++++++\n");
                     failed_last_attempt = 1;
-                    g_mutex_unlock (self->plan_mutex);
+                    //g_mutex_unlock (self->plan_mutex);
                     break;
                 }
 
