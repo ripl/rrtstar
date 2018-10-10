@@ -20,7 +20,7 @@
 
 #include <lcmtypes/bot2_core.h>
 #include <lcmtypes/rrtstar_lcmtypes.h>
-#include <lcmtypes/ripl_goal_list_t.h>
+#include <lcmtypes/rrt_goal_list_t.h>
 #include <bot_lcmgl_client/lcmgl.h>
 
 #include "opttree.h"
@@ -81,7 +81,7 @@ typedef struct _rrtstar_t {
     rrt_config_t config;
     opttree_t *opttree;
 
-    ripl_rrt_environment_t *rrt_environment_last;
+    rrt_environment_t *rrt_environment_last;
 
     GMutex *mutex;
     GMutex *plan_mutex;
@@ -134,7 +134,7 @@ typedef struct _rrtstar_t {
 
     gboolean executing_mp_cmd;
 
-    ripl_goal_list_t *goal_list;
+    rrt_goal_list_t *goal_list;
 
     int current_goal_ind;
     int do_turn_only;
@@ -150,7 +150,7 @@ typedef struct _rrtstar_t {
     bot_lcmgl_t *lcmgl_committed_point;
 
     int32_t goal_id;
-    ripl_rrt_goal_status_t *goal_status;
+    rrt_goal_status_t *goal_status;
 
     int publish_waypoint_status;
 
@@ -235,7 +235,7 @@ int get_bot_rel_quad (double x, double y, double x_0, double y_0, double yaw )
 }
 
 int
-is_bot_at_goal (rrtstar_t *self, ripl_goal_t *latest_goal) {
+is_bot_at_goal (rrtstar_t *self, rrt_goal_t *latest_goal) {
     if (!self->bot_pose_last)
         return -1;
 
@@ -257,7 +257,7 @@ is_bot_at_goal (rrtstar_t *self, ripl_goal_t *latest_goal) {
 }
 
 // Not currently used
-int is_bot_at_goal_tight (rrtstar_t *self, ripl_goal_t *latest_goal) {
+int is_bot_at_goal_tight (rrtstar_t *self, rrt_goal_t *latest_goal) {
     if (!self->bot_pose_last)
         return -1;
 
@@ -279,7 +279,7 @@ int is_bot_at_goal_tight (rrtstar_t *self, ripl_goal_t *latest_goal) {
 }
 
 int
-is_bot_near_goal (rrtstar_t *self, ripl_goal_t *latest_goal) {
+is_bot_near_goal (rrtstar_t *self, rrt_goal_t *latest_goal) {
     if (!self->bot_pose_last)
         return -1;
     if(!latest_goal){
@@ -383,29 +383,29 @@ is_committed_trajectory_in_collision (rrtstar_t *self) {
 
 static void
 on_rrt_command (const lcm_recv_buf_t *buf, const char *channel,
-                const ripl_rrt_command_t *msg, void *user);
+                const rrt_command_t *msg, void *user);
 
 
 static void
 on_goal_status (const lcm_recv_buf_t *buf, const char *channel,
-                    const ripl_rrt_goal_status_t *msg, void *user){
+                    const rrt_goal_status_t *msg, void *user){
     rrtstar_t *self = (rrtstar_t*) user;
     if(self->goal_status !=NULL){
-        ripl_rrt_goal_status_t_destroy(self->goal_status);
+        rrt_goal_status_t_destroy(self->goal_status);
     }
-    self->goal_status = ripl_rrt_goal_status_t_copy(msg);
+    self->goal_status = rrt_goal_status_t_copy(msg);
 }
 
 
 void stop_controller_motion(rrtstar_t *self){
 
-    ripl_ref_point_list_t pub = {
+    rrt_ref_point_list_t pub = {
         .num_ref_points = 0,
         .ref_points = NULL,
         .mode = RIPL_REF_POINT_LIST_T_NORMAL_MOTION,
         .id = -1//self->goal_id
     };
-    ripl_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
+    rrt_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
 }
 
 //to use this - we would need to change the id size to 64 bit
@@ -430,7 +430,7 @@ get_unique_id_32t (void)
 // trajectory
 static void
 on_goals(const lcm_recv_buf_t * rbuf, const char *channel,
-         const ripl_goal_list_t *msg, void *user) {
+         const rrt_goal_list_t *msg, void *user) {
     rrtstar_t *self = (rrtstar_t*) user;
 
     int is_running = 0;
@@ -440,7 +440,7 @@ on_goals(const lcm_recv_buf_t * rbuf, const char *channel,
     g_mutex_unlock(self->running_mutex);
 
     if (self->goal_list){
-        ripl_goal_list_t_destroy(self->goal_list);
+        rrt_goal_list_t_destroy(self->goal_list);
     }
 
     // We probably don't want to be stopping the robot and rrtstar
@@ -451,13 +451,13 @@ on_goals(const lcm_recv_buf_t * rbuf, const char *channel,
         stop_controller_motion(self);
     }
 
-    self->goal_list = ripl_goal_list_t_copy(msg);
+    self->goal_list = rrt_goal_list_t_copy(msg);
 
     fprintf(stdout, "New goal received - From Sender ID : %d\n",
                 (int)msg->sender_id);
 
     //we should send this to the waypoint follower
-    ripl_goal_t *latest_goal = &(self->goal_list->goals[self->goal_list->num_goals-1]);
+    rrt_goal_t *latest_goal = &(self->goal_list->goals[self->goal_list->num_goals-1]);
 
     self->sent_at_goal = FALSE;
     self->commited_to_final_goal = FALSE;
@@ -472,11 +472,11 @@ on_goals(const lcm_recv_buf_t * rbuf, const char *channel,
 
         fprintf(stderr, "+++++ We are at the goal - not checking for orientation\n");
 
-        ripl_rrt_goal_status_t msg;
+        rrt_goal_status_t msg;
         msg.utime = bot_timestamp_now();
         msg.utime = self->current_goal_ind;
         msg.status = RIPL_RRT_GOAL_STATUS_T_REACHED;
-        ripl_rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
+        rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
 
         return;
     }
@@ -616,7 +616,7 @@ on_bot_pose (const lcm_recv_buf_t *rbuf, const char *channel,
     }
 
     /*if(self->goal_list){
-        ripl_goal_t *final_goal = &(self->goal_list->goals[self->goal_list->num_goals-1]);
+        rrt_goal_t *final_goal = &(self->goal_list->goals[self->goal_list->num_goals-1]);
         int bot_at_goal = is_bot_at_goal_tight(self,final_goal);
         if(bot_at_goal){
             fprintf(stderr, "Bot at goal \n" );
@@ -747,9 +747,9 @@ rrtstar_t *rrtstar_create(gboolean sensing_only_local, gboolean trash_tree_on_wp
 
     self->executing_mp_cmd = FALSE;
 
-    ripl_goal_list_t_subscribe(self->lcm, "RRTSTAR_GOALS", on_goals, self);
+    rrt_goal_list_t_subscribe(self->lcm, "RRTSTAR_GOALS", on_goals, self);
 
-    ripl_rrt_goal_status_t_subscribe(self->lcm, "TRAJECTORY_CONTROLLER_GOAL_STATUS",
+    rrt_goal_status_t_subscribe(self->lcm, "TRAJECTORY_CONTROLLER_GOAL_STATUS",
                                     on_goal_status, self);
 
     bot_core_pose_t_subscribe (self->lcm, "POSE", on_bot_pose, self);
@@ -763,7 +763,7 @@ optmain_publish_optimal_path (rrtstar_t *self, gboolean rampup_speed,
                               double *new_root, int invalid_root) {
 
     int count = 0;
-    ripl_ref_point_t goal;
+    rrt_ref_point_t goal;
 
     int commited_node_id = 0;
     int found_commited_root = 0;
@@ -787,7 +787,7 @@ optmain_publish_optimal_path (rrtstar_t *self, gboolean rampup_speed,
         return 0;
     }
 
-    ripl_ref_point_t list[n_states];
+    rrt_ref_point_t list[n_states];
 
     if (optstates_list) {
         GSList *optstates_ptr = optstates_list;
@@ -892,7 +892,7 @@ optmain_publish_optimal_path (rrtstar_t *self, gboolean rampup_speed,
     }
 
 
-    ripl_ref_point_list_t pub = {
+    rrt_ref_point_list_t pub = {
         .num_ref_points = count,
         .commited_point_id = act_commited_node_id,
         .ref_points = list,
@@ -900,7 +900,7 @@ optmain_publish_optimal_path (rrtstar_t *self, gboolean rampup_speed,
         .id = self->goal_id
     };
 
-    ripl_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
+    rrt_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
 
     return 1;
 }
@@ -910,7 +910,7 @@ int
 optmain_publish_optimal_path_to_old_goal (rrtstar_t *self, gboolean rampup_speed,  double *new_root, int invalid_root) {
 
     int count = 0;
-    ripl_ref_point_t goal;
+    rrt_ref_point_t goal;
 
     int commited_node_id = 0;
     int found_commited_root = 0;
@@ -927,7 +927,7 @@ optmain_publish_optimal_path_to_old_goal (rrtstar_t *self, gboolean rampup_speed
         }
     }
 
-    ripl_ref_point_t list[n_states];
+    rrt_ref_point_t list[n_states];
 
     if (optstates_list) {
         GSList *optstates_ptr = optstates_list;
@@ -1022,14 +1022,14 @@ optmain_publish_optimal_path_to_old_goal (rrtstar_t *self, gboolean rampup_speed
     }
 
 
-    ripl_ref_point_list_t pub = {
+    rrt_ref_point_list_t pub = {
         .num_ref_points = count,
         .commited_point_id = act_commited_node_id,
         .ref_points = list,
         .mode = RIPL_REF_POINT_LIST_T_NORMAL_MOTION,
         .id = self->goal_id
     };
-    ripl_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
+    rrt_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
 
     return 1;
 }
@@ -1235,12 +1235,12 @@ int publish_traj (rrtstar_t *self) {
     }
 
 
-    ripl_rrt_traj_t *opttraj = (ripl_rrt_traj_t *) malloc (sizeof (ripl_rrt_traj_t));
+    rrt_traj_t *opttraj = (rrt_traj_t *) malloc (sizeof (rrt_traj_t));
 
     if (num_states > 0) {
 
         opttraj->num_states = num_states;
-        opttraj->states = (ripl_rrt_state_t *) malloc (opttraj->num_states * sizeof (ripl_rrt_state_t));
+        opttraj->states = (rrt_state_t *) malloc (opttraj->num_states * sizeof (rrt_state_t));
 
         int state_count = 0;
         GSList *opttraj_nodes_ptr = opttraj_nodes;
@@ -1270,8 +1270,8 @@ int publish_traj (rrtstar_t *self) {
         opttraj->states = NULL;
     }
 
-    ripl_rrt_traj_t_publish (self->lcm, "RRTSTAR_TRAJECTORY", opttraj);
-    ripl_rrt_traj_t_destroy (opttraj);
+    rrt_traj_t_publish (self->lcm, "RRTSTAR_TRAJECTORY", opttraj);
+    rrt_traj_t_destroy (opttraj);
 
     return 1;
 }
@@ -1305,12 +1305,12 @@ int publish_tree (rrtstar_t *self) {
 
     GSList *list_nodes = opttree->list_nodes;
 
-    ripl_rrt_tree_t *tree = (ripl_rrt_tree_t *) calloc (1, sizeof (ripl_rrt_tree_t));
+    rrt_tree_t *tree = (rrt_tree_t *) calloc (1, sizeof (rrt_tree_t));
 
     tree->num_nodes = g_slist_length (list_nodes);
     if (tree->num_nodes > 0) {
-        tree->nodes = (ripl_rrt_node_t *) calloc (tree->num_nodes , sizeof (ripl_rrt_node_t));
-        tree->traj_from_parent = (ripl_rrt_traj_t *) calloc (tree->num_nodes , sizeof (ripl_rrt_traj_t));
+        tree->nodes = (rrt_node_t *) calloc (tree->num_nodes , sizeof (rrt_node_t));
+        tree->traj_from_parent = (rrt_traj_t *) calloc (tree->num_nodes , sizeof (rrt_traj_t));
     }
     else {
         tree->nodes = NULL;
@@ -1330,7 +1330,7 @@ int publish_tree (rrtstar_t *self) {
         tree->traj_from_parent[node_index].num_states = num_states_in_traj_from_parent;
         if (num_states_in_traj_from_parent) {
             tree->traj_from_parent[node_index].states
-                = (ripl_rrt_state_t *) calloc (num_states_in_traj_from_parent , sizeof(ripl_rrt_state_t));
+                = (rrt_state_t *) calloc (num_states_in_traj_from_parent , sizeof(rrt_state_t));
             int state_index = 0;
             for (GSList *iter2 = node_curr->traj_from_parent; iter2 != NULL; iter2 = g_slist_next (iter2)) {
                 state_t *state_curr = (state_t *) (iter2->data);
@@ -1380,10 +1380,10 @@ int publish_tree (rrtstar_t *self) {
         tree->edges = NULL;
     }
 
-    ripl_rrt_tree_t_publish (self->lcm, "RRTSTAR_TREE", tree);
+    rrt_tree_t_publish (self->lcm, "RRTSTAR_TREE", tree);
 
     if(tree){
-        ripl_rrt_tree_t_destroy (tree);
+        rrt_tree_t_destroy (tree);
     }
 
     return 1;
@@ -1593,8 +1593,8 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
         no_planning = 1;
 
         //message to controller goes here
-        ripl_ref_point_t list[1];
-        ripl_ref_point_t goal;
+        rrt_ref_point_t list[1];
+        rrt_ref_point_t goal;
 
         goal.x = self->bot_pose_last->pos[0];//root_state->x[0];
         goal.y = self->bot_pose_last->pos[1];//root_state->x[1];
@@ -1602,13 +1602,13 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
         goal.s = 0;
         list[0] = goal;
 
-        ripl_ref_point_list_t pub = {
+        rrt_ref_point_list_t pub = {
             .num_ref_points = 1,
             .ref_points = list,
             .mode = RIPL_REF_POINT_LIST_T_TURN_IN_PLACE,
             .id = self->goal_id
         };
-        ripl_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
+        rrt_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
     }
 
     else{
@@ -1628,8 +1628,8 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
                                             self->goal_list->goals[c_ind].pos[0] -self->bot_pose_last->pos[0]);
 
                 //message to controller goes here
-                ripl_ref_point_t list[1];
-                ripl_ref_point_t goal;
+                rrt_ref_point_t list[1];
+                rrt_ref_point_t goal;
 
                 goal.x = self->bot_pose_last->pos[0];
                 goal.y = self->bot_pose_last->pos[1];
@@ -1637,13 +1637,13 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
                 goal.s = 0;
                 list[0] = goal;
 
-                ripl_ref_point_list_t pub = {
+                rrt_ref_point_list_t pub = {
                     .num_ref_points = 1,
                     .ref_points = list,
                     .mode = RIPL_REF_POINT_LIST_T_TURN_IN_PLACE,
                     .id = self->goal_id
                 };
-                ripl_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
+                rrt_ref_point_list_t_publish (self->lcm, "GOAL_REF_LIST", &pub);
             }
         }
     }
@@ -1693,7 +1693,7 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
     if(no_planning){
         fprintf(stderr, "Done turning - stop the loop and go back to the start. Robot has arrived at the current goal\n");
 
-        ripl_rrt_goal_status_t msg;
+        rrt_goal_status_t msg;
         msg.utime = bot_timestamp_now();
         msg.utime = self->current_goal_ind;
         if(failed_rotate){
@@ -1703,7 +1703,7 @@ int handle_first_wp(rrtstar_t *self, int c_ind){
             msg.status = RIPL_RRT_GOAL_STATUS_T_REACHED;
         }
 
-        ripl_rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
+        rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
 
         g_mutex_lock(self->running_mutex);
         self->is_running = 0;
@@ -2068,11 +2068,11 @@ on_planning_thread (gpointer data) {
         //now we need to wait until the robot has reached the end of the committed trajctory
         if(c_ind > 0 && self->committed_traj && !stop_iter){
 
-            ripl_rrt_goal_status_t msg;
+            rrt_goal_status_t msg;
             msg.utime = bot_timestamp_now();
             msg.utime = self->current_goal_ind;
             msg.status = RIPL_RRT_GOAL_STATUS_T_ACTIVE;
-            ripl_rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
+            rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
 
             int wait_count = 0;
 
@@ -2439,7 +2439,7 @@ on_planning_thread (gpointer data) {
         if (self->config.traj_pub_final)
             publish_traj (self);
 
-        ripl_goal_t *final_goal = &(self->goal_list->goals[self->goal_list->num_goals-1]);
+        rrt_goal_t *final_goal = &(self->goal_list->goals[self->goal_list->num_goals-1]);
         int bot_at_goal = is_bot_at_goal(self,final_goal);
 
         if (self->verbose_motion)
@@ -2467,11 +2467,11 @@ on_planning_thread (gpointer data) {
 
             if(second_failure && (self->current_goal_ind == (self->goal_list->num_goals-1))){
                 fprintf(stderr,"Second failure on the last goal - send out failed to get to goal msg - stopping\n");
-                ripl_rrt_goal_status_t msg;
+                rrt_goal_status_t msg;
                 msg.utime = bot_timestamp_now();
                 msg.utime = self->current_goal_ind;
                 msg.status = RIPL_RRT_GOAL_STATUS_T_FAILED;
-                ripl_rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
+                rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
             }
 
             int stop_iter = 0;
@@ -2503,11 +2503,11 @@ on_planning_thread (gpointer data) {
                         if(self->publish_waypoint_status){
                             fprintf(stdout, "Robot has arrived at the current goal\n");
 
-                            ripl_rrt_goal_status_t msg;
+                            rrt_goal_status_t msg;
                             msg.utime = bot_timestamp_now();
                             msg.utime = self->current_goal_ind;
                             msg.status = RIPL_RRT_GOAL_STATUS_T_REACHED;
-                            ripl_rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
+                            rrt_goal_status_t_publish (self->lcm, "RRT_GOAL_STATUS", &msg);
                         }
 
                         fprintf(stderr, "Robot Stopped - Publishing waypoint status\n");
