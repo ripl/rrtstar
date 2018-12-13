@@ -135,6 +135,7 @@ typedef struct _rrtstar_t {
     gboolean executing_mp_cmd;
 
     rrt_goal_list_t *goal_list;
+    rrt_goal_list_t *goal_list_global;
 
     int current_goal_ind;
     int do_turn_only;
@@ -422,6 +423,63 @@ get_unique_id_32t (void)
 }
 
 
+static void convert_goal_list_to_global(rrtstar_t *self){
+    if(!self->goal_list_global)
+        return;
+    rrt_goal_list_t *goal_list = self->goal_list_global;
+    BotTrans local_to_global;
+    bot_frames_get_trans_with_utime(self->frames, "local", "global", goal_list->utime, &local_to_global);
+    for(int i=0; i < goal_list->num_goals; i++){
+        rrt_goal_t *goal = &goal_list->goals[i];
+        double pos_local[3] = {goal->pos[0], goal->pos[1], 0};
+        double pos_global[3];
+        bot_frames_transform_vec (self->frames, "local", "global",  pos_local, pos_global);
+        double rpy_local[3] = {0, 0, goal->theta};
+        double quat_local[4];
+        bot_roll_pitch_yaw_to_quat(rpy_local, quat_local);
+        double quat_global[4];
+        bot_quat_mult (quat_global, local_to_global.rot_quat, quat_local);
+        double rpy_global[3];
+        bot_quat_to_roll_pitch_yaw(quat_global, rpy_global);
+        goal->pos[0] = pos_global[0];
+        goal->pos[1] = pos_global[1];
+        goal->theta = rpy_global[2];
+    }
+}
+static void update_local_goal_list(rrtstar_t *self){
+    if(0){
+        //don't update
+        return;
+    }
+    if(!self->goal_list_global ||  !self->goal_list)
+        return;
+    rrt_goal_list_t *g_list = self->goal_list_global;
+    rrt_goal_list_t *l_list = self->goal_list;
+    if(l_list->num_goals != g_list->num_goals){
+        fprintf(stderr, "Goal list sizes are different\n");
+        exit(-1);
+    }
+    BotTrans global_to_local;
+    bot_frames_get_trans(self->frames, "global", "local", &global_to_local);
+    for(int i=0; i < g_list->num_goals; i++){
+        rrt_goal_t *goal = &g_list->goals[i];
+        rrt_goal_t *l_goal = &l_list->goals[i];
+        double pos_global[3] = {goal->pos[0], goal->pos[1], 0};
+        double pos_local[3];
+        bot_frames_transform_vec (self->frames, "global", "local",  pos_global, pos_local);
+        double rpy_global[3] = {0, 0, goal->theta};
+        double quat_global[4];
+        bot_roll_pitch_yaw_to_quat(rpy_global, quat_global);
+        double quat_local[4];
+        bot_quat_mult (quat_local, global_to_local.rot_quat, quat_global);
+        double rpy_local[3];
+        bot_quat_to_roll_pitch_yaw(quat_local, rpy_local);
+        l_goal->pos[0] = pos_local[0];
+        l_goal->pos[1] = pos_local[1];
+        l_goal->theta = rpy_local[2];
+    }
+}
+
 // If we get a new goal list, we currently stop the robot and stop searching.
 // We should instead adapt the tree according to the new goal (i.e., identify
 // the (new) optimial path to the goal if it exists and continue planning).
@@ -443,6 +501,10 @@ on_goals(const lcm_recv_buf_t * rbuf, const char *channel,
         rrt_goal_list_t_destroy(self->goal_list);
     }
 
+    if(self->goal_list_global){
+       rrt_goal_list_t_destroy(self->goal_list_global);
+    }
+
     // We probably don't want to be stopping the robot and rrtstar
     if(is_running){
         g_mutex_lock (self->stop_iter_mutex);
@@ -452,11 +514,15 @@ on_goals(const lcm_recv_buf_t * rbuf, const char *channel,
     }
 
     self->goal_list = rrt_goal_list_t_copy(msg);
+    self->goal_list_global = rrt_goal_list_t_copy(msg);
+
+    convert_goal_list_to_global (self);
 
     fprintf(stdout, "New goal received - From Sender ID : %d\n",
                 (int)msg->sender_id);
 
     //we should send this to the waypoint follower
+    update_local_goal_list(self);
     rrt_goal_t *latest_goal = &(self->goal_list->goals[self->goal_list->num_goals-1]);
 
     self->sent_at_goal = FALSE;
@@ -731,6 +797,7 @@ rrtstar_t *rrtstar_create(gboolean sensing_only_local, gboolean trash_tree_on_wp
     self->committed_traj = NULL;
     self->bot_pose_last = NULL;
     self->goal_list = NULL;
+    self->goal_list_global = NULL;
 
     self->opttree = opttree_create (sensing_only_local, draw, clear_using_laser, sensing_only_small, check_gridmap_width_buffer);
 
@@ -2439,6 +2506,7 @@ on_planning_thread (gpointer data) {
         if (self->config.traj_pub_final)
             publish_traj (self);
 
+        update_local_goal_list (self);
         rrt_goal_t *final_goal = &(self->goal_list->goals[self->goal_list->num_goals-1]);
         int bot_at_goal = is_bot_at_goal(self,final_goal);
 
@@ -2459,6 +2527,7 @@ on_planning_thread (gpointer data) {
             }
             //we have more goals - move on to the next one
             self->current_goal_ind++;
+            update_local_goal_list (self);
 
             opttree_reset (self->opttree);
             g_mutex_unlock (self->plan_mutex);
