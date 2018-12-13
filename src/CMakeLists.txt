@@ -9,35 +9,28 @@ add_executable(rrtstar
     kdtree.h
     kdtree.c)
 
-target_link_libraries (rrtstar
-    ${LCMTYPES_LIBS})
-
 pods_use_pkg_config_packages(rrtstar
     lcm
     glib-2.0
     bot2-core
-    lcmtypes_hr-lcmtypes
-    lcmtypes_obstacle-detector
+    lcmtypes_rrtstar
     bot2-param-client
-    geom-utils
-    check_gridmap)
+    check-gridmap)
 
 # make exeutables public
 pods_install_executables(rrtstar)
 
 
 
-add_executable(testrrtstar
-    test_rrtstar.c)
-
-target_link_libraries (testrrtstar
-    ${LCMTYPES_LIBS})
-
-pods_use_pkg_config_packages(testrrtstar
-    lcm
-    glib-2.0
-    bot2-core
-    lcmtypes_hr-lcmtypes)
-
-# make exeutables public
-pods_install_executables(testrrtstar)
+# add_executable(testrrtstar
+#     test_rrtstar.c)
+#
+# pods_use_pkg_config_packages(testrrtstar
+#     lcm
+#     glib-2.0
+#     bot2-core
+#     lcmtypes_rrtstar
+#     lcmtypes_hr-lcmtypes)
+#
+# # make exeutables public
+# pods_install_executables(testrrtstar)

@@ -1,9 +1,0 @@
-package ripl;
-
-struct rrt_environment_region_2d_t {
-       
-       double center[2];
-       double size[2];
-
-       // TODO: add angle to these, or use more general polygons
-}

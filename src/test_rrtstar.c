@@ -7,7 +7,8 @@
 
 #include <lcmtypes/bot2_core.h>
 #include <lcmtypes/hr_lcmtypes.h>
-#include <lcmtypes/obs_lcmtypes.h>
+#include <lcmtypes/obstacle_detector_lcmtypes.h>
+#include <lcmtypes/rrtstar_lcmtypes.h>
 
 static void
 send_obs_message(lcm_t * lcm)
@@ -45,10 +46,10 @@ static void
 send_goal_message(lcm_t * lcm)
 {
 
-    ripl_goal_list_t my_goals;
+    rrt_goal_list_t my_goals;
     my_goals.num_goals = 3;
 
-    ripl_goal_t *goal  = (ripl_goal_t*)calloc(3, sizeof(ripl_goal_t));
+    rrt_goal_t *goal  = (rrt_goal_t*)calloc(3, sizeof(rrt_goal_t));
     goal[0].id = 1;
     goal[0].pos[0] = 1.1;
     goal[0].pos[1] = -6.7;
@@ -68,7 +69,7 @@ send_goal_message(lcm_t * lcm)
     goal[2].size[1] = 3;
 
     my_goals.goals = goal;
-    ripl_goal_list_t_publish(lcm, "RRTSTAR_GOALS", &my_goals);
+    rrt_goal_list_t_publish(lcm, "RRTSTAR_GOALS", &my_goals);
     free(goal);
     return;
 }
